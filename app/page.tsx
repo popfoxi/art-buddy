@@ -1167,10 +1167,10 @@ export default function Home() {
                                  setSelectedArtwork(referenceArtwork);
                              }}>
                                  <img 
-                                     src={`https://pollinations.ai/p/${encodeURIComponent(referenceArtwork.prompt)}?width=300&height=${referenceArtwork.height}&nologo=true`}
-                                     alt="Reference" 
-                                     className="w-full h-full object-cover"
-                                 />
+                                    src={referenceArtwork.imageUrl}
+                                    alt="Reference" 
+                                    className="w-full h-full object-cover"
+                                />
                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                                      <Maximize2 size={20} className="text-white opacity-0 group-hover:opacity-100 transition-opacity transform scale-75 group-hover:scale-100" />
                                  </div>
@@ -1484,7 +1484,7 @@ export default function Home() {
             <div className="bg-white rounded-2xl overflow-hidden max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl">
                 <div className="relative flex-1 bg-slate-100 overflow-hidden flex items-center justify-center min-h-[300px]">
                      <img 
-                        src={`https://pollinations.ai/p/${encodeURIComponent(selectedArtwork.prompt)}?width=600&height=${selectedArtwork.height * 2}&nologo=true`}
+                        src={selectedArtwork.imageUrl}
                         alt={selectedArtwork.title}
                         className="max-w-full max-h-full object-contain"
                     />
