@@ -39,6 +39,10 @@ export async function POST(req: Request) {
               "confidence": number (0-100),
               "analysis": "encouraging and specific analysis text (max 100 words)",
               "score": number (0-100),
+              "styleMatch": {
+                "score": number (0-100),
+                "comment": "Specific comment about how well it matches the target style (max 50 words)"
+              },
               "encouragement": "short encouraging phrase",
               "feedback": [
                 {
@@ -51,7 +55,8 @@ export async function POST(req: Request) {
               "nextStep": "actionable next step"
             }
             Ensure 'feedback' array has 2-3 items pointing to specific areas to improve.
-            Coordinates should be percentages relative to the image size (x,y is top-left).`
+            Coordinates should be percentages relative to the image size (x,y is top-left).
+            If no specific style was requested, set styleMatch to null.`
           },
           {
             role: "user",

@@ -28,7 +28,8 @@ import {
     AlertCircle,
     Paintbrush,
     CheckCircle2,
-    Mail
+    Mail,
+    Heart
   } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -533,19 +534,38 @@ export default function Home() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isChallengeSource: boolean = false) => {
     const file = e.target.files?.[0];
     if (file) {
       const imageUrl = URL.createObjectURL(file);
-      setSelectedImage(imageUrl);
+      
+      let effectiveChallengeId = currentChallengeId;
+      
+      // If uploading from Challenge tab but ID is lost, try to recover it from active challenges
+      if (isChallengeSource && !effectiveChallengeId && selectedStyle) {
+          const activeChallenge = userChallenges.find(c => c.status === 'in_progress' && c.master === selectedStyle);
+          if (activeChallenge) {
+              effectiveChallengeId = activeChallenge.id;
+              setCurrentChallengeId(effectiveChallengeId);
+          }
+      }
+
+      // If NOT in challenge mode, trigger global modal
+      if (!effectiveChallengeId) {
+        setSelectedImage(imageUrl);
+        setResult(null); 
+      }
+      
       setIsAnalyzing(true);
-      setResult(null); 
       
       try {
         const base64 = await fileToBase64(file);
         const aiResult = await analyzeWithAI(base64);
         if (aiResult) {
-            setResult(aiResult);
+            // If NOT in challenge mode, update global result
+            if (!effectiveChallengeId) {
+                setResult(aiResult);
+            }
             
             // Save to History
             const newHistoryItem = {
@@ -562,9 +582,9 @@ export default function Home() {
             setHistoryItems(prev => [newHistoryItem, ...prev]);
 
             // Update Challenge if applicable
-            if (currentChallengeId) {
+            if (effectiveChallengeId) {
                 setUserChallenges(prev => prev.map(c => {
-                    if (c.id === currentChallengeId) {
+                    if (c.id === effectiveChallengeId) {
                         return {
                             ...c,
                             status: 'completed',
@@ -578,18 +598,25 @@ export default function Home() {
                     }
                     return c;
                 }));
+                // Auto-open detailed feedback for challenge
+                setSelectedHistoryItem(newHistoryItem);
                 setCurrentChallengeId(null); // Reset current challenge
             }
 
         } else {
-             setResult({
-                detectedStyle: "分析失敗",
-                confidence: 0,
-                analysis: "AI 無法分析此圖片，請檢查網路連線或稍後再試。",
-                score: 0,
-                encouragement: "請稍後再試",
-                feedback: []
-              });
+             // Handle error
+             if (!effectiveChallengeId) {
+                setResult({
+                    detectedStyle: "分析失敗",
+                    confidence: 0,
+                    analysis: "AI 無法分析此圖片，請檢查網路連線或稍後再試。",
+                    score: 0,
+                    encouragement: "請稍後再試",
+                    feedback: []
+                });
+             } else {
+                 alert("分析失敗，請稍後再試");
+             }
         }
       } catch (error) {
         console.error(error);
@@ -667,8 +694,8 @@ export default function Home() {
                 </label>
             </div>
 
-            {/* Result Preview */}
-            {selectedImage && (
+            {/* Result Preview - MOVED TO GLOBAL */}
+            {false && selectedImage && (
               <motion.div 
                 initial={{ opacity: 0, y: "100%" }}
                 animate={{ opacity: 1, y: 0 }}
@@ -764,6 +791,24 @@ export default function Home() {
                             </div>
                         </div>
 
+                        {/* Style Match Card (Only if style is provided) */}
+                        {result.styleMatch && (
+                            <div className="bg-gradient-to-r from-rose-50 to-orange-50 p-4 rounded-xl border border-rose-100 flex items-start gap-4">
+                                <div className="bg-white p-2 rounded-lg shadow-sm text-center min-w-[70px]">
+                                    <div className="text-[10px] text-slate-400 font-bold uppercase">符合度</div>
+                                    <div className="text-xl font-black text-rose-600">{result.styleMatch.score}%</div>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-900 text-sm mb-1">
+                                        與「{selectedStyle || '目標風格'}」的相似度分析
+                                    </h4>
+                                    <p className="text-xs text-slate-600 leading-relaxed">
+                                        {result.styleMatch.comment}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Main Analysis */}
                         <div className="space-y-2">
                           <h3 className="font-bold text-slate-900 flex items-center gap-2">
@@ -845,13 +890,13 @@ export default function Home() {
                       key={medium.id}
                       onClick={() => setSelectedMedium(medium.id === selectedMedium ? null : medium.id)}
                       className={`
-                        flex flex-col items-center justify-center p-3 rounded-xl transition-all cursor-pointer aspect-square
+                        flex flex-col items-center justify-center p-3 rounded-xl transition-all cursor-pointer aspect-square border
                         ${selectedMedium === medium.id 
-                          ? "bg-rose-600 text-white shadow-lg ring-2 ring-rose-200 ring-offset-2 scale-105" 
-                          : `${medium.color} hover:bg-slate-200`}
+                          ? "bg-rose-50 text-rose-600 border-rose-200 shadow-sm ring-1 ring-rose-200 scale-105" 
+                          : "bg-white text-slate-600 border-slate-100 hover:bg-slate-50 hover:border-slate-200"}
                       `}
                     >
-                      <div className="text-2xl mb-1">{medium.icon}</div>
+                      <div className="text-2xl mb-1 grayscale-[0.2]">{medium.icon}</div>
                       <div className="font-bold text-[11px] text-center leading-tight">
                           {medium.name}
                       </div>
@@ -950,7 +995,7 @@ export default function Home() {
         {activeTab === "explore" && (
           <div className="space-y-6 animate-fadeIn pb-20">
              {/* Filter Header - Wrapped Layout */}
-             <header className="mb-4 py-2">
+             <header className="mb-4 py-2 sticky top-0 bg-slate-50 z-20 pb-4">
                 <div className="flex items-center justify-between mb-3">
                     <h1 className="text-xl font-black text-slate-900">靈感探索</h1>
                     <span className="text-[10px] bg-rose-100 text-rose-600 px-2 py-1 rounded-full font-bold">
@@ -958,14 +1003,39 @@ export default function Home() {
                     </span>
                 </div>
 
+                {/* Tab Switcher */}
+                <div className="flex p-1 bg-white border border-slate-200 rounded-xl mb-4 w-full max-w-[200px]">
+                    <button
+                        onClick={() => {
+                            setExploreFilterType("medium");
+                            setSelectedMaster(null);
+                        }}
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${exploreFilterType === "medium" ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                    >
+                        依媒材
+                    </button>
+                    <button
+                        onClick={() => {
+                            setExploreFilterType("master");
+                            setSelectedMedium(null);
+                        }}
+                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${exploreFilterType === "master" ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                    >
+                        依大師
+                    </button>
+                </div>
+
                 {/* Active Filters Display */}
-                {selectedMaster && (
+                {(selectedMaster || selectedMedium) && (
                     <div className="flex items-center gap-2 mb-3 animate-fadeIn">
-                        <span className="text-xs font-bold text-slate-500">篩選大師:</span>
+                        <span className="text-xs font-bold text-slate-500">篩選:</span>
                         <div className="flex items-center gap-1 bg-rose-50 border border-rose-100 text-rose-700 px-2 py-1 rounded-lg text-xs font-bold">
-                            {selectedMaster}
+                            {selectedMaster || artMediums.find(m => m.id === selectedMedium)?.name}
                             <button 
-                                onClick={() => setSelectedMaster(null)}
+                                onClick={() => {
+                                    setSelectedMaster(null);
+                                    setSelectedMedium(null);
+                                }}
                                 className="p-0.5 hover:bg-rose-100 rounded-full"
                             >
                                 <X size={12} />
@@ -983,27 +1053,48 @@ export default function Home() {
                         className={`
                             px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm
                             ${!selectedMedium && !selectedMaster
-                                ? "bg-slate-900 text-white border-slate-900 scale-105" 
+                                ? "bg-slate-800 text-white border-slate-800" 
                                 : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
                         `}
                     >
                         全部
                     </button>
-                    {artMediums.map((medium) => (
-                        <button 
-                            key={medium.id}
-                            onClick={() => setSelectedMedium(medium.id === selectedMedium ? null : medium.id)}
-                            className={`
-                                px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm flex items-center gap-1.5
-                                ${selectedMedium === medium.id 
-                                    ? "bg-rose-600 text-white border-rose-600 scale-105" 
-                                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
-                            `}
-                        >
-                            <span className="text-sm">{medium.icon}</span>
-                            {medium.name.split('/')[0]}
-                        </button>
-                    ))}
+
+                    {exploreFilterType === "medium" ? (
+                        /* Medium Filters */
+                        artMediums.map((medium) => (
+                            <button 
+                                key={medium.id}
+                                onClick={() => setSelectedMedium(medium.id === selectedMedium ? null : medium.id)}
+                                className={`
+                                    px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm flex items-center gap-1.5
+                                    ${selectedMedium === medium.id 
+                                        ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
+                                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                `}
+                            >
+                                <span className="text-sm grayscale-[0.2]">{medium.icon}</span>
+                                {medium.name.split('/')[0]}
+                            </button>
+                        ))
+                    ) : (
+                        /* Master Filters */
+                        Array.from(new Set(exploreGallery.map(i => i.master))).sort().map((master) => (
+                            <button 
+                                key={master}
+                                onClick={() => setSelectedMaster(master === selectedMaster ? null : master)}
+                                className={`
+                                    px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-sm flex items-center gap-1.5
+                                    ${selectedMaster === master
+                                        ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
+                                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                `}
+                            >
+                                <User size={12} className={selectedMaster === master ? "text-rose-500" : "text-slate-400"} />
+                                {master}
+                            </button>
+                        ))
+                    )}
                 </div>
              </header>
 
@@ -1197,7 +1288,7 @@ export default function Home() {
                             type="file" 
                             accept="image/*" 
                             className="hidden" 
-                            onChange={handleImageUpload}
+                            onChange={(e) => handleImageUpload(e, true)}
                         />
                         <div className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-200">
                             <Upload size={18} />
@@ -1413,10 +1504,70 @@ export default function Home() {
                         <div className="text-2xl font-black text-slate-900">{userChallenges.filter(c => c.status === 'completed').length}</div>
                         <div className="text-[10px] text-slate-400 font-bold mt-1">完成挑戰</div>
                     </div>
-                    <div className="bg-white p-3 rounded-2xl border border-slate-100 text-center">
+                    <button 
+                        onClick={() => {
+                            const gallery = document.getElementById('favorites-gallery');
+                            if (gallery) {
+                                gallery.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        }}
+                        className="bg-white p-3 rounded-2xl border border-slate-100 text-center hover:border-rose-200 hover:bg-rose-50/50 transition-all cursor-pointer"
+                    >
                         <div className="text-2xl font-black text-slate-900">{favoriteArtworkIds.length}</div>
                         <div className="text-[10px] text-slate-400 font-bold mt-1">收藏作品</div>
+                    </button>
+                </div>
+
+                {/* Favorites Gallery */}
+                <div id="favorites-gallery" className="bg-white p-4 rounded-2xl border border-slate-100 scroll-mt-24">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-bold text-slate-900 flex items-center gap-2">
+                            <Heart size={18} className="text-rose-500 fill-rose-500" />
+                            我的收藏
+                        </h2>
+                        <span className="text-xs text-slate-400 font-medium">
+                            {favoriteArtworkIds.length} 作品
+                        </span>
                     </div>
+
+                    {favoriteArtworkIds.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-3">
+                            {exploreGallery
+                                .filter(artwork => favoriteArtworkIds.includes(artwork.id))
+                                .map(artwork => (
+                                    <div 
+                                        key={artwork.id} 
+                                        onClick={() => setSelectedArtwork(artwork)}
+                                        className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100"
+                                    >
+                                        <img 
+                                            src={artwork.imageUrl} 
+                                            alt={artwork.title} 
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                                            <p className="text-white text-xs font-bold line-clamp-1">{artwork.title}</p>
+                                            <p className="text-white/80 text-[10px]">{artwork.master}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
+                             <div className="flex justify-center mb-2">
+                                 <Heart size={32} className="opacity-20" />
+                             </div>
+                             <p className="text-sm font-medium text-slate-500">還沒有收藏作品</p>
+                             <p className="text-xs text-slate-400 mt-1">在探索頁面看到喜歡的畫作，點擊愛心即可收藏！</p>
+                             <button 
+                                onClick={() => setActiveTab("explore")}
+                                className="mt-4 text-xs bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-full font-bold hover:bg-slate-50 transition-colors shadow-sm"
+                             >
+                                去探索逛逛
+                             </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Menu List */}
@@ -1470,6 +1621,186 @@ export default function Home() {
         )}
 
       </div>
+
+      {/* Result Preview (Global) */}
+      {selectedImage && (
+        <motion.div 
+          initial={{ opacity: 0, y: "100%" }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className="fixed inset-0 z-[49] bg-slate-50 overflow-y-auto"
+          id="result-section"
+        >
+          {/* Header */}
+          <div className="bg-white px-4 py-3 sticky top-0 z-20 border-b border-slate-100 flex items-center justify-between shadow-sm safe-top">
+               <div className="flex items-center gap-2">
+                   <div className="bg-rose-600 text-white p-1.5 rounded-lg">
+                       <Sparkles size={16} />
+                   </div>
+                   <span className="font-bold text-slate-900">分析結果</span>
+               </div>
+               <button 
+                   onClick={() => {
+                       setSelectedImage(null);
+                       setResult(null);
+                   }}
+                   className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+               >
+                   <X size={20} />
+               </button>
+          </div>
+
+          <div className="p-5 pb-32">
+              <div className="aspect-video bg-slate-100 rounded-xl mb-6 overflow-hidden relative shadow-inner group">
+                <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
+                
+                {/* Feedback Overlays */}
+                {result && !isAnalyzing && result.feedback.map((item: any, idx: number) => (
+                    <div 
+                      key={idx}
+                      className={`absolute border-2 rounded-lg transition-all duration-300 pointer-events-none
+                          ${activeFeedbackIndex === idx 
+                              ? "border-rose-500 bg-rose-500/10 opacity-100 scale-100 shadow-[0_0_15px_rgba(244,63,94,0.5)]" 
+                              : "border-transparent opacity-0 scale-95"
+                          }
+                      `}
+                      style={{
+                          left: `${item.coordinate?.x}%`,
+                          top: `${item.coordinate?.y}%`,
+                          width: `${item.coordinate?.w}%`,
+                          height: `${item.coordinate?.h}%`,
+                      }}
+                    >
+                        <div className={`
+                          absolute -top-3 left-0 bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm
+                          ${activeFeedbackIndex === idx ? "opacity-100" : "opacity-0"}
+                        `}>
+                            修改建議 {idx + 1}
+                        </div>
+                    </div>
+                ))}
+
+                {isAnalyzing && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white px-6 py-4 rounded-2xl flex flex-col items-center gap-3 text-sm font-bold shadow-2xl animate-pulse">
+                      <Scan size={32} className="text-rose-600 animate-spin-slow" />
+                      <span className="text-slate-800">老師正在仔細看你的畫...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {result && !isAnalyzing && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6"
+                >
+                  {/* Score and Style Card */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                          <Star size={120} className="text-rose-500 transform rotate-12 translate-x-10 -translate-y-10" fill="currentColor" />
+                      </div>
+                      
+                      <div className="flex items-center justify-between relative z-10">
+                          <div>
+                              <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">風格判定</div>
+                              <div className="text-2xl font-black text-slate-900">{result.detectedStyle}</div>
+                          </div>
+                          <div className="text-center">
+                              <div className="text-xs text-rose-500 font-bold uppercase tracking-wider mb-1">AI 評分</div>
+                              <div className="text-5xl font-black text-rose-600 tracking-tighter flex items-start justify-center gap-1">
+                                  <span className="text-2xl mt-1 opacity-0">0</span>
+                                  {result.score}
+                                  <span className="text-lg text-rose-400 font-bold mt-4">/100</span>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* Style Match Card (Only if style is provided) */}
+                  {result.styleMatch && (
+                      <div className="bg-gradient-to-r from-rose-50 to-orange-50 p-4 rounded-xl border border-rose-100 flex items-start gap-4">
+                          <div className="bg-white p-2 rounded-lg shadow-sm text-center min-w-[70px]">
+                              <div className="text-[10px] text-slate-400 font-bold uppercase">符合度</div>
+                              <div className="text-xl font-black text-rose-600">{result.styleMatch.score}%</div>
+                          </div>
+                          <div>
+                              <h4 className="font-bold text-slate-900 text-sm mb-1">
+                                  與「{selectedStyle || '目標風格'}」的相似度分析
+                              </h4>
+                              <p className="text-xs text-slate-600 leading-relaxed">
+                                  {result.styleMatch.comment}
+                              </p>
+                          </div>
+                      </div>
+                  )}
+
+                  {/* Main Analysis */}
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                      <Sparkles size={18} className="text-yellow-500" />
+                      整體點評
+                    </h3>
+                    <p className="text-sm text-slate-600 leading-relaxed bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                      {result.analysis}
+                    </p>
+                  </div>
+
+                  {/* Technique Breakdown */}
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2">
+                      <Brush size={16} />
+                      修改重點
+                    </h4>
+                    {result.feedback.map((item: any, idx: number) => (
+                      <div 
+                          key={idx} 
+                          onMouseEnter={() => setActiveFeedbackIndex(idx)}
+                          onMouseLeave={() => setActiveFeedbackIndex(null)}
+                          className={`
+                              group relative pl-4 border-l-2 transition-all cursor-pointer p-2 rounded-r-lg
+                              ${activeFeedbackIndex === idx 
+                                  ? "border-rose-500 bg-rose-50" 
+                                  : "border-slate-200 hover:border-rose-300 hover:bg-slate-50"}
+                          `}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className={`
+                              text-[10px] font-bold px-1.5 py-0.5 rounded text-white
+                              ${activeFeedbackIndex === idx ? "bg-rose-500" : "bg-slate-300"}
+                            `}>
+                                {idx + 1}
+                            </span>
+                            <div className="font-bold text-slate-900 text-sm">{item.title}</div>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                          {item.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="border-t border-slate-100 pt-4 mt-4">
+                      <p className="text-center text-xs text-slate-400 mb-4">
+                          還想問問其他媒材怎麼畫嗎？
+                      </p>
+                      <button 
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setResult(null);
+                        }}
+                        className="w-full py-3 text-slate-500 font-bold text-sm bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                      >
+                        再問一張
+                      </button>
+                  </div>
+                </motion.div>
+              )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Lightbox Modal */}
       {selectedArtwork && (
@@ -1760,38 +2091,38 @@ export default function Home() {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 z-50">
-        <div className="max-w-md mx-auto px-6 h-20 flex items-center justify-between pb-4">
+        <div className="max-w-md mx-auto h-20 grid grid-cols-5 items-center pb-4">
           <button 
             onClick={() => setActiveTab("home")}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === "home" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "home" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
           >
             <HomeIcon size={24} />
             <span className="text-[10px] font-bold">首頁</span>
           </button>
           <button 
             onClick={() => setActiveTab("explore")}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === "explore" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "explore" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
           >
             <Compass size={24} />
             <span className="text-[10px] font-bold">探索</span>
           </button>
           <button 
             onClick={() => setActiveTab("challenge")}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === "challenge" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "challenge" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
           >
-            <Trophy size={24} />
+            <Trophy size={24} className={activeTab === "challenge" ? "fill-current" : ""} />
             <span className="text-[10px] font-bold">挑戰</span>
           </button>
           <button 
             onClick={() => setActiveTab("history")}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === "history" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "history" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
           >
             <History size={24} />
             <span className="text-[10px] font-bold">紀錄</span>
           </button>
           <button 
             onClick={() => setActiveTab("profile")}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === "profile" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "profile" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
           >
             <User size={24} />
             <span className="text-[10px] font-bold">我的</span>
