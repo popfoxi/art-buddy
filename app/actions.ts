@@ -37,3 +37,40 @@ export async function getUserTickets() {
 
   return tickets;
 }
+
+export async function getUserCredits() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return 0;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { credits: true },
+  });
+
+  return user?.credits || 0;
+}
+
+export async function decrementUserCredits() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { credits: true },
+  });
+
+  if (!user || user.credits <= 0) {
+    throw new Error("Not enough credits");
+  }
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { credits: { decrement: 1 } },
+  });
+
+  return { success: true };
+}

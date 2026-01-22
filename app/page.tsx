@@ -35,7 +35,7 @@ import {
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { createTicket, getUserTickets } from "@/app/actions";
+import { createTicket, getUserTickets, getUserCredits, decrementUserCredits } from "@/app/actions";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -69,6 +69,14 @@ export default function Home() {
   // Usage Limit State
   const [analysisCount, setAnalysisCount] = useState(0);
   const [lastAnalysisReset, setLastAnalysisReset] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number>(0);
+
+  // Fetch credits from server
+  useEffect(() => {
+    if (session?.user?.id) {
+        getUserCredits().then(setCredits).catch(console.error);
+    }
+  }, [session, activeTab]); // Refresh when tab changes (e.g. after profile update)
 
   // Login Modal State
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -723,6 +731,16 @@ export default function Home() {
         const aiResult = await analyzeWithAI(base64);
         if (aiResult) {
             setAnalysisCount(prev => prev + 1);
+
+            // Decrement credits for logged-in users
+            if (session?.user) {
+                try {
+                    await decrementUserCredits();
+                    setCredits(prev => Math.max(0, prev - 1));
+                } catch (err) {
+                    console.error("Failed to decrement credit", err);
+                }
+            }
 
             // If NOT in challenge mode, update global result
             if (!effectiveChallengeId) {
@@ -1648,7 +1666,7 @@ export default function Home() {
                                 )}
                                 <span className="text-[10px] text-rose-500 font-bold">
                                     {session 
-                                        ? `本週剩餘 ${Math.max(0, 1 - analysisCount)} 次` 
+                                        ? `剩餘點數 ${credits} 點` 
                                         : `本月剩餘 ${Math.max(0, 1 - analysisCount)} 次`
                                     }
                                 </span>

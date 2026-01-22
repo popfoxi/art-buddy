@@ -637,7 +637,7 @@ export default function AdminPage() {
                                             value={settings["adsense_id"] || ""}
                                             onChange={(e) => setSettings(prev => ({ ...prev, "adsense_id": e.target.value }))}
                                             placeholder="pub-XXXXXXXXXXXXXXXX"
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                                            className="w-full max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
                                         />
                                     </div>
                                 </div>
