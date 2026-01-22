@@ -58,11 +58,32 @@ export async function getAdminStats() {
     },
   });
 
+  // 6. Analysis Trend (Last 7 Days)
+  const analysisTrend = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+    const nextDate = new Date(date);
+    nextDate.setDate(date.getDate() + 1);
+
+    const count = await prisma.analysis.count({
+      where: {
+        createdAt: {
+          gte: date,
+          lt: nextDate,
+        },
+      },
+    });
+    analysisTrend.push(count);
+  }
+
   return {
     totalUsers,
     todayAnalysis,
     conversionRate: conversionRate.toFixed(1),
     monthlyRevenue,
+    analysisTrend,
     recentUsers: recentUsers.map((u: any) => ({
       ...u,
       provider: u.accounts[0]?.provider || "email",

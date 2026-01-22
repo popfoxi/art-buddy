@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
     const { image, style } = await req.json();
 
     if (!image) {
@@ -81,6 +84,31 @@ export async function POST(req: Request) {
 
     const data = await response.json();
     const content = JSON.parse(data.choices[0].message.content);
+
+    // Save analysis to database if user is logged in
+    if (session?.user?.email) {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { email: session.user.email },
+        });
+
+        if (user) {
+          // Truncate image data if it's too long (optional, but good for performance if using base64)
+          // For now, we save it as is to allow viewing in admin
+          await prisma.analysis.create({
+            data: {
+              userId: user.id,
+              imageUrl: image, // Note: storing base64 in DB is not ideal for production but works for now
+              score: content.score || 0,
+              result: JSON.stringify(content),
+            },
+          });
+        }
+      } catch (dbError) {
+        console.error("Failed to save analysis to DB:", dbError);
+        // Don't fail the request if saving fails
+      }
+    }
 
     return NextResponse.json(content);
 

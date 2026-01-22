@@ -34,7 +34,8 @@ export default function AdminPage() {
     todayAnalysis: 0,
     conversionRate: "0",
     monthlyRevenue: 0,
-    recentUsers: [] as any[]
+    recentUsers: [] as any[],
+    analysisTrend: [0, 0, 0, 0, 0, 0, 0]
   });
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,9 +91,10 @@ export default function AdminPage() {
   const isUserAdmin = session?.user?.email === adminEmail;
 
   // Mock Revenue Data (until real payments are integrated)
-  const revenueData = [120, 300, 250, 400, 380, 500, 450];
-  const maxRevenue = Math.max(...revenueData);
-
+  // Use real analysis trend data if available, otherwise fallback to 0s
+  const revenueData = stats.analysisTrend || [0, 0, 0, 0, 0, 0, 0];
+  const maxRevenue = Math.max(...revenueData) || 10; // Prevent division by zero
+  
   if (status === "unauthenticated") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
@@ -224,36 +226,37 @@ export default function AdminPage() {
             {/* Revenue Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="text-sm text-slate-500 font-bold mb-1">本月總營收</div>
-                    <div className="text-3xl font-black text-slate-900">$12,450</div>
+                    <div className="text-sm text-slate-500 font-bold mb-1">今日分析次數</div>
+                    <div className="text-3xl font-black text-slate-900">{stats.todayAnalysis}</div>
                     <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
-                        <TrendingUp size={14} /> +15.3% 較上月
+                        <TrendingUp size={14} /> 即時更新
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="text-sm text-slate-500 font-bold mb-1">活躍訂閱數</div>
-                    <div className="text-3xl font-black text-slate-900">482</div>
+                    <div className="text-sm text-slate-500 font-bold mb-1">活躍訂閱數 (付費)</div>
+                    <div className="text-3xl font-black text-slate-900">{users.filter(u => u.plan !== 'free').length}</div>
                     <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
-                        <TrendingUp size={14} /> +8.1% 較上月
+                        <TrendingUp size={14} /> {(parseFloat(stats.conversionRate)).toFixed(1)}% 轉換率
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="text-sm text-slate-500 font-bold mb-1">平均客單價 (ARPU)</div>
-                    <div className="text-3xl font-black text-slate-900">$25.8</div>
-                    <div className="text-xs font-bold text-slate-400 mt-2">持平</div>
+                    <div className="text-sm text-slate-500 font-bold mb-1">平均分析分數 (今日)</div>
+                    <div className="text-3xl font-black text-slate-900">-</div>
+                    <div className="text-xs font-bold text-slate-400 mt-2">資料累積中</div>
                 </div>
             </div>
 
             {/* Revenue Chart */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-6">近 7 日營收趨勢</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-6">近 7 日 AI 分析次數趨勢 (Analysis Trend)</h3>
                 <div className="h-64 flex items-end justify-between gap-2">
                     {revenueData.map((val, idx) => (
                         <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
                             <div className="relative w-full bg-blue-50 rounded-t-lg overflow-hidden group-hover:bg-blue-100 transition-colors" style={{ height: `${(val / maxRevenue) * 100}%` }}>
                                 <div className="absolute bottom-0 w-full bg-blue-500 h-0 transition-all duration-500" style={{ height: '100%' }}></div>
+                                <div className="absolute top-0 w-full text-center text-[10px] text-blue-600 font-bold mt-1 opacity-0 group-hover:opacity-100">{val}</div>
                             </div>
-                            <span className="text-xs font-bold text-slate-400">{idx + 1}日</span>
+                            <span className="text-xs font-bold text-slate-400">{idx === 6 ? 'Today' : `${6-idx}d ago`}</span>
                         </div>
                     ))}
                 </div>
