@@ -547,7 +547,7 @@ export default function AdminPage() {
                     <div className="text-sm text-slate-500 font-bold mb-1">活躍訂閱數 (付費)</div>
                     <div className="text-3xl font-black text-slate-900">{users.filter(u => u.plan !== 'free').length}</div>
                     <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
-                        <TrendingUp size={14} /> {(parseFloat(stats.conversionRate)).toFixed(1)}% 轉換率
+                        <TrendingUp size={14} /> {(parseFloat(stats.retentionRate || "0")).toFixed(1)}% 轉換率
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
@@ -708,8 +708,9 @@ export default function AdminPage() {
                                         <button 
                                             onClick={() => {
                                                 if (ticket.user) {
-                                                    setSelectedUser(ticket.user);
+                                                    setSelectedUserForCredit(ticket.user);
                                                     setCreditAmount(ticket.user.credits || 0);
+                                                    setIsCreditModalOpen(true);
                                                 }
                                             }}
                                             className="text-xs font-bold text-emerald-600 hover:underline"
@@ -962,19 +963,19 @@ export default function AdminPage() {
       )}
 
       {/* Edit Credits Modal */}
-      {selectedUser && (
+      {isCreditModalOpen && selectedUserForCredit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
                 <h3 className="text-lg font-bold text-slate-900">管理用戶點數</h3>
-                <p className="text-sm text-slate-500">調整 {selectedUser.name} 的可用分析次數。</p>
+                <p className="text-sm text-slate-500">調整 {selectedUserForCredit.name} 的可用分析次數。</p>
                 <div className="flex items-center gap-4 justify-center py-4">
                     <button onClick={() => setCreditAmount(Math.max(0, creditAmount - 1))} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><Minus size={20} /></button>
                     <span className="text-3xl font-black text-slate-900">{creditAmount}</span>
                     <button onClick={() => setCreditAmount(creditAmount + 1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><Plus size={20} /></button>
                 </div>
                 <div className="flex gap-3">
-                    <button onClick={() => setSelectedUser(null)} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl">取消</button>
-                    <button onClick={() => handleUpdateCredits(selectedUser.id, creditAmount)} className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl">確認更新</button>
+                    <button onClick={() => setIsCreditModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl">取消</button>
+                    <button onClick={() => handleUpdateCredits(selectedUserForCredit.id, creditAmount)} className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl">確認更新</button>
                 </div>
             </div>
         </div>
