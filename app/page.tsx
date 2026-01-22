@@ -1507,7 +1507,6 @@ export default function Home() {
                                                                 description: exploreGallery.find(g => g.id === challenge.galleryId)?.description || ""
                                                             });
                                                             setCurrentChallengeId(challenge.id);
-                                                            setActiveTab("home");
                                                             window.scrollTo({ top: 0, behavior: 'smooth' });
                                                         }}
                                                         className="text-xs bg-rose-600 text-white px-4 py-1.5 rounded-full font-bold hover:bg-rose-700 transition-colors shadow-sm shadow-rose-200"
