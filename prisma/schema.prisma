@@ -72,3 +72,11 @@ model Analysis {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+// System Configuration
+model SystemSetting {
+  key         String   @id
+  value       String   @db.Text
+  description String?
+  updatedAt   DateTime @updatedAt
+}

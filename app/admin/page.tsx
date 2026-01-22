@@ -62,13 +62,43 @@ export default function AdminPage() {
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   const isUserAdmin = session?.user?.email === adminEmail;
 
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-xl max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-slate-900/20">
+            <Shield size={32} className="text-white" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-slate-900">管理員登入</h1>
+            <p className="text-slate-500">請登入以存取管理後台</p>
+          </div>
+          <Link 
+            href="/api/auth/signin" 
+            className="block w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 active:scale-[0.98]"
+          >
+            登入帳號
+          </Link>
+          <Link href="/" className="block text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">
+            返回首頁
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!isUserAdmin) {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
             <Shield size={64} className="text-slate-300 mb-4" />
             <h1 className="text-2xl font-bold text-slate-900 mb-2">權限不足</h1>
-            <p className="text-slate-500 text-center max-w-md mb-8">此頁面僅限管理員存取。</p>
-            <Link href="/" className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold">回首頁</Link>
+            <p className="text-slate-500 text-center max-w-md mb-8">
+              您目前的帳號 ({session?.user?.email}) 沒有管理員權限。
+            </p>
+            <div className="flex gap-4">
+              <Link href="/api/auth/signin" className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold">切換帳號</Link>
+              <Link href="/" className="px-6 py-3 bg-slate-200 text-slate-900 rounded-xl font-bold">回首頁</Link>
+            </div>
         </div>
     );
   }
@@ -198,6 +228,53 @@ export default function AdminPage() {
                 </div>
             </div>
           </div>
+        );
+
+      case "settings":
+        return (
+            <div className="space-y-6 max-w-2xl">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-slate-900">系統設定</h2>
+                    {saveMessage && (
+                        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg text-sm font-bold animate-fade-in">
+                            <CheckCircle2 size={16} /> {saveMessage}
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                    <div className="space-y-2">
+                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            Google Analytics 4
+                        </h3>
+                        <p className="text-sm text-slate-500">
+                            輸入您的 GA4 評估 ID (Measurement ID)，例如：G-XXXXXXXXXX。
+                            設定後，系統將自動在全站注入追蹤程式碼。
+                        </p>
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="block text-xs font-bold text-slate-700 mb-1">評估 ID (Measurement ID)</label>
+                                <input 
+                                    type="text" 
+                                    value={settings["ga4_id"] || ""}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, "ga4_id": e.target.value }))}
+                                    placeholder="G-XXXXXXXXXX"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end pt-2">
+                            <button 
+                                onClick={() => handleSaveSetting("ga4_id", settings["ga4_id"] || "")}
+                                disabled={isSaving}
+                                className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
+                            >
+                                {isSaving ? "儲存中..." : <><Save size={18} /> 儲存設定</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         );
 
       default: // overview

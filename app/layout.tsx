@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { prisma } from "@/lib/db";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -55,11 +57,21 @@ const jsonLd = {
   }
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let ga4Id = null;
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: "ga4_id" }
+    });
+    ga4Id = setting?.value;
+  } catch (error) {
+    // Ignore db errors
+  }
+
   return (
     <html lang="zh-TW">
       <head>
@@ -69,6 +81,22 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.className} bg-slate-50 text-slate-900`}>
+        {ga4Id && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${ga4Id}');
+              `}
+            </Script>
+          </>
+        )}
         <Providers>
           {children}
         </Providers>

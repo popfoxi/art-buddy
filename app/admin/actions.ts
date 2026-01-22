@@ -131,3 +131,36 @@ export async function getUsers(query?: string, role?: string, plan?: string) {
     createdAt: u.createdAt,
   }));
 }
+
+export async function getSystemSettings() {
+  const session = await auth();
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+
+  if (!session?.user?.email || session.user.email !== adminEmail) {
+    throw new Error("Unauthorized");
+  }
+
+  const settings = await prisma.systemSetting.findMany();
+  // Convert array to object for easier consumption
+  return settings.reduce((acc, curr) => {
+    acc[curr.key] = curr.value;
+    return acc;
+  }, {} as Record<string, string>);
+}
+
+export async function updateSystemSetting(key: string, value: string) {
+  const session = await auth();
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+
+  if (!session?.user?.email || session.user.email !== adminEmail) {
+    throw new Error("Unauthorized");
+  }
+
+  await prisma.systemSetting.upsert({
+    where: { key },
+    update: { value },
+    create: { key, value },
+  });
+
+  return { success: true };
+}
