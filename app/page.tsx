@@ -679,9 +679,7 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 bg-rose-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-rose-200">
-              <Palette size={26} />
-            </div>
+            <img src="/logo.svg" alt="ArtTutor123 Logo" className="w-11 h-11 rounded-xl shadow-md shadow-rose-200" />
             <div className="flex flex-col justify-center">
                 <span className="font-black text-2xl text-slate-900 leading-none mb-1">畫重點</span>
                 <span className="text-[10px] font-bold text-rose-500 tracking-[0.2em] leading-none uppercase">ArtTutor123</span>
@@ -2263,8 +2261,8 @@ export default function Home() {
                 </button>
                 
                 <div className="p-8 text-center">
-                    <div className="w-20 h-20 bg-rose-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-rose-200 mx-auto mb-6 transform rotate-6 hover:rotate-0 transition-transform duration-500">
-                        <Palette size={40} />
+                    <div className="w-20 h-20 mx-auto mb-6 rounded-2xl shadow-xl shadow-rose-200 transform rotate-6 hover:rotate-0 transition-transform duration-500 overflow-hidden">
+                        <img src="/logo.svg" alt="ArtTutor123 Logo" className="w-full h-full object-cover" />
                     </div>
                     <h2 className="text-2xl font-black text-slate-900 mb-1">畫重點</h2>
                     <p className="text-xs font-bold text-rose-500 tracking-[0.2em] uppercase mb-6">ArtTutor123</p>
