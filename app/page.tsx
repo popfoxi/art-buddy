@@ -685,41 +685,16 @@ export default function Home() {
                 </div>
                 
                 <label className="block w-full relative z-10">
-                  <div className="grid grid-cols-2 gap-3">
-                     <div 
-                       onClick={() => document.getElementById('camera-upload')?.click()}
-                       className="py-3.5 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-lg shadow-rose-200"
-                     >
-                       <Camera size={20} />
-                       <span className="text-xs">拍照上傳</span>
-                     </div>
-                     <div 
-                       onClick={() => document.getElementById('gallery-upload')?.click()}
-                       className="py-3.5 bg-white text-rose-600 border border-rose-200 rounded-xl font-bold text-center cursor-pointer hover:bg-rose-50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
-                     >
-                       <div className="flex items-center gap-1">
-                          <Upload size={20} />
-                       </div>
-                       <span className="text-xs">相簿選取</span>
-                     </div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageUpload}
+                  />
+                  <div className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-200">
+                    <Upload size={18} />
+                    上傳作品求點評
                   </div>
-                  
-                  {/* Hidden Inputs */}
-                  <input 
-                    id="camera-upload"
-                    type="file" 
-                    accept="image/*" 
-                    capture="environment"
-                    className="hidden" 
-                    onChange={handleImageUpload}
-                  />
-                  <input 
-                    id="gallery-upload"
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleImageUpload}
-                  />
                 </label>
             </div>
 
