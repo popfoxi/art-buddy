@@ -1313,40 +1313,16 @@ export default function Home() {
 
                      {/* Upload Button inside Banner */}
                      <label className="block w-full relative z-10 pt-2">
-                        <div className="grid grid-cols-2 gap-3">
-                           <div 
-                             onClick={() => document.getElementById('challenge-camera-upload')?.click()}
-                             className="py-3 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-lg shadow-rose-200"
-                           >
-                             <Camera size={18} />
-                             <span className="text-xs">拍照上傳</span>
-                           </div>
-                           <div 
-                             onClick={() => document.getElementById('challenge-gallery-upload')?.click()}
-                             className="py-3 bg-white text-rose-600 border border-rose-200 rounded-xl font-bold text-center cursor-pointer hover:bg-rose-50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
-                           >
-                             <div className="flex items-center gap-1">
-                                <Upload size={18} />
-                             </div>
-                             <span className="text-xs">相簿選取</span>
-                           </div>
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => handleImageUpload(e, true)}
+                        />
+                        <div className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-200">
+                            <Upload size={18} />
+                            上傳挑戰作品
                         </div>
-
-                        <input 
-                            id="challenge-camera-upload"
-                            type="file" 
-                            accept="image/*" 
-                            capture="environment"
-                            className="hidden" 
-                            onChange={(e) => handleImageUpload(e, true)}
-                        />
-                        <input 
-                            id="challenge-gallery-upload"
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={(e) => handleImageUpload(e, true)}
-                        />
                     </label>
                  </div>
              )}
