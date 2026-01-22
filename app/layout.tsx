@@ -63,11 +63,18 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   let ga4Id = null;
+  let adsenseId = null;
   try {
-    const setting = await prisma.systemSetting.findUnique({
-      where: { key: "ga4_id" }
+    const settings = await prisma.systemSetting.findMany({
+      where: { key: { in: ["ga4_id", "adsense_id"] } }
     });
-    ga4Id = setting?.value;
+    const settingsMap = settings.reduce((acc, curr) => {
+      acc[curr.key] = curr.value;
+      return acc;
+    }, {} as Record<string, string>);
+    
+    ga4Id = settingsMap["ga4_id"];
+    adsenseId = settingsMap["adsense_id"];
   } catch (error) {
     // Ignore db errors
   }
@@ -79,6 +86,13 @@ export default async function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        {adsenseId && (
+          <script 
+            async 
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseId}`}
+            crossOrigin="anonymous"
+          ></script>
+        )}
       </head>
       <body className={`${inter.className} bg-slate-50 text-slate-900`}>
         {ga4Id && (
