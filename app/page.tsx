@@ -111,6 +111,11 @@ export default function Home() {
   const [favoriteFilterType, setFavoriteFilterType] = useState<"all" | "medium" | "master">("all");
   const [favoriteFilterValue, setFavoriteFilterValue] = useState<string | null>(null);
 
+  // Profile Modal States
+  const [showProModal, setShowProModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+
   const toggleFavorite = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     setFavoriteArtworkIds(prev => {
@@ -1500,14 +1505,26 @@ export default function Home() {
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-white p-3 rounded-2xl border border-slate-100 text-center">
+                    <button 
+                        onClick={() => {
+                            setActiveTab('history');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="bg-white p-3 rounded-2xl border border-slate-100 text-center cursor-pointer hover:border-blue-200 hover:bg-blue-50/50 transition-all"
+                    >
                         <div className="text-2xl font-black text-slate-900">{historyItems.length}</div>
                         <div className="text-[10px] text-slate-400 font-bold mt-1">分析次數</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-2xl border border-slate-100 text-center">
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setActiveTab('challenge');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="bg-white p-3 rounded-2xl border border-slate-100 text-center cursor-pointer hover:border-purple-200 hover:bg-purple-50/50 transition-all"
+                    >
                         <div className="text-2xl font-black text-slate-900">{userChallenges.filter(c => c.status === 'completed').length}</div>
                         <div className="text-[10px] text-slate-400 font-bold mt-1">完成挑戰</div>
-                    </div>
+                    </button>
                     <button 
                         onClick={() => {
                             const gallery = document.getElementById('favorites-gallery');
@@ -1654,7 +1671,10 @@ export default function Home() {
 
                 {/* Menu List */}
                 <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-                    <button className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors border-b border-slate-50">
+                    <button 
+                        onClick={() => setShowProModal(true)}
+                        className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors border-b border-slate-50"
+                    >
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
                                 <CreditCard size={16} />
@@ -1663,7 +1683,10 @@ export default function Home() {
                         </div>
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
-                    <button className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors border-b border-slate-50">
+                    <button 
+                        onClick={() => setShowSettingsModal(true)}
+                        className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors border-b border-slate-50"
+                    >
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
                                 <Settings size={16} />
@@ -1672,7 +1695,10 @@ export default function Home() {
                         </div>
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
-                    <button className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <button 
+                        onClick={() => setShowAboutModal(true)}
+                        className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                    >
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center">
                                 <Info size={16} />
@@ -2165,6 +2191,191 @@ export default function Home() {
                         >
                             暫不登入，繼續體驗
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* === PRO MODAL === */}
+      {showProModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-slideUp relative">
+                <button 
+                    onClick={() => setShowProModal(false)}
+                    className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors z-10"
+                >
+                    <X size={20} />
+                </button>
+                
+                <div className="p-6">
+                    <div className="text-center mb-6">
+                        <div className="w-16 h-16 bg-gradient-to-br from-rose-400 to-rose-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-200 transform rotate-3">
+                            <Star size={32} fill="currentColor" />
+                        </div>
+                        <h2 className="text-xl font-black text-slate-900 mb-1">升級 Pro 專業版</h2>
+                        <p className="text-sm text-slate-500">解鎖完整學習體驗</p>
+                    </div>
+
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-6">
+                        <div className="flex items-baseline justify-center gap-1 mb-4">
+                            <span className="text-3xl font-black text-slate-900">$120</span>
+                            <span className="text-sm text-slate-500 font-bold">/ 月</span>
+                        </div>
+                        <ul className="space-y-3">
+                            {[
+                                "無限次 AI 作品分析",
+                                "專屬大師風格評分報告",
+                                "解鎖所有教學內容與技巧",
+                                "優先獲得新功能體驗",
+                                "去除所有廣告"
+                            ].map((feature, i) => (
+                                <li key={i} className="flex items-center gap-3 text-sm text-slate-700">
+                                    <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+                                        <CheckCircle2 size={12} />
+                                    </div>
+                                    {feature}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <button className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 mb-3">
+                        立即升級
+                    </button>
+                    <p className="text-center text-[10px] text-slate-400">
+                        隨時可取消訂閱，不綁約
+                    </p>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* === SETTINGS MODAL === */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-slideUp relative">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <h2 className="text-lg font-black text-slate-900">系統設定</h2>
+                    <button 
+                        onClick={() => setShowSettingsModal(false)}
+                        className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <div className="p-2">
+                    <div className="p-4 flex items-center justify-between border-b border-slate-50">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-100 rounded-lg text-slate-600">
+                                <AlertCircle size={18} />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">接收推播通知</span>
+                        </div>
+                        <div className="w-10 h-6 bg-rose-600 rounded-full relative cursor-pointer">
+                            <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                        </div>
+                    </div>
+                    <div className="p-4 flex items-center justify-between border-b border-slate-50">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-100 rounded-lg text-slate-600">
+                                <Zap size={18} />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">深色模式</span>
+                        </div>
+                        <div className="w-10 h-6 bg-slate-200 rounded-full relative cursor-pointer">
+                            <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                        </div>
+                    </div>
+                    <button 
+                        className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                        onClick={() => {
+                            if(confirm("確定要清除快取嗎？這可能會登出您的帳號。")) {
+                                localStorage.clear();
+                                window.location.reload();
+                            }
+                        }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-orange-50 text-orange-500 rounded-lg">
+                                <History size={18} />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">清除應用程式快取</span>
+                        </div>
+                    </button>
+                </div>
+
+                <div className="p-4 bg-slate-50 text-center">
+                    <div className="text-xs font-bold text-slate-500 mb-1">ArtTutor123 畫重點</div>
+                    <div className="text-[10px] text-slate-400">Version 1.0.0 (Build 2026.01.21)</div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* === ABOUT MODAL === */}
+      {showAboutModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-slideUp relative max-h-[80vh] overflow-y-auto">
+                <button 
+                    onClick={() => setShowAboutModal(false)}
+                    className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors z-10"
+                >
+                    <X size={20} />
+                </button>
+                
+                <div className="p-8 text-center">
+                    <div className="w-20 h-20 bg-rose-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-rose-200 mx-auto mb-6 transform rotate-6 hover:rotate-0 transition-transform duration-500">
+                        <Palette size={40} />
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-900 mb-1">畫重點</h2>
+                    <p className="text-xs font-bold text-rose-500 tracking-[0.2em] uppercase mb-6">ArtTutor123</p>
+                    
+                    <div className="space-y-6 text-left">
+                        <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
+                            <h3 className="font-bold text-rose-700 mb-2 flex items-center gap-2">
+                                <Sparkles size={16} />
+                                你的 24 小時貼身繪畫家教
+                            </h3>
+                            <p className="text-sm text-slate-700 leading-relaxed">
+                                我們相信每個人都能畫出心中的畫面。ArtTutor123 結合最新 AI 視覺分析技術，為您提供即時、專業的繪畫指導，就像身邊隨時有一位美術老師，隨拍隨問，讓學習繪畫不再有門檻。
+                            </p>
+                        </div>
+
+                        <div>
+                            <h3 className="font-bold text-slate-900 mb-3">主要功能</h3>
+                            <ul className="space-y-3">
+                                <li className="flex gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center flex-shrink-0">
+                                        <Scan size={16} />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-800">AI 即時評點</div>
+                                        <p className="text-xs text-slate-500">上傳作品，立即獲得構圖、色彩、光影的具體修改建議。</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center flex-shrink-0">
+                                        <Compass size={16} />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-800">風格探索挑戰</div>
+                                        <p className="text-xs text-slate-500">跟隨大師的腳步，挑戰不同畫風，系統化累積你的創作經驗。</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div className="pt-6 border-t border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 mb-4">
+                                有任何建議或問題？歡迎聯繫我們
+                            </p>
+                            <button className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-full text-xs font-bold hover:bg-slate-800 transition-colors">
+                                <Mail size={14} />
+                                聯絡開發團隊
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
