@@ -2120,13 +2120,14 @@ export default function Home() {
                     <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative">
                         <button 
                             onClick={() => setProPlanType("pro")}
-                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 ${proPlanType === "pro" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 flex flex-col items-center justify-center leading-none gap-1 ${proPlanType === "pro" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                         >
-                            Pro
+                            <span className="text-sm">Plus</span>
+                            <span className="text-[10px] text-rose-500 font-extrabold">推薦</span>
                         </button>
                         <button 
                             onClick={() => setProPlanType("pro_plus")}
-                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 ${proPlanType === "pro_plus" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 flex items-center justify-center ${proPlanType === "pro_plus" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                         >
                             Pro+
                         </button>
@@ -2176,7 +2177,7 @@ export default function Home() {
                     </div>
 
                     <button className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 mb-3">
-                        立即升級 {proPlanType === "pro" ? "Pro" : "Pro+"}
+                        立即升級 {proPlanType === "pro" ? "Plus" : "Pro+"}
                     </button>
                     <p className="text-center text-[10px] text-slate-400">
                         隨時可取消訂閱，不綁約
