@@ -88,13 +88,41 @@ export default function Home() {
             setUserChallenges(data.challenges || []);
             setFavoriteArtworkIds(data.favorites || []);
 
-            // Usage Limit Logic (Monthly Reset)
+            // Usage Limit Logic
+            // Guest: Monthly Reset
+            // Free User: Weekly Reset
             const savedReset = data.lastAnalysisReset || new Date().toISOString();
             const lastResetDate = new Date(savedReset);
             const now = new Date();
+            const isGuest = !session?.user?.email;
             
-            // Check if month has changed
-            if (lastResetDate.getMonth() !== now.getMonth() || lastResetDate.getFullYear() !== now.getFullYear()) {
+            let shouldReset = false;
+
+            if (isGuest) {
+                // Monthly check
+                if (lastResetDate.getMonth() !== now.getMonth() || lastResetDate.getFullYear() !== now.getFullYear()) {
+                    shouldReset = true;
+                }
+            } else {
+                // Free User (or Pro, but Pro doesn't matter as limit is high) -> Weekly check
+                // Reset if it's a new week (Monday start)
+                const getWeekNumber = (d: Date) => {
+                    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+                    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+                    var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                    var weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+                    return [d.getUTCFullYear(), weekNo];
+                };
+                
+                const [lastYear, lastWeek] = getWeekNumber(lastResetDate);
+                const [currYear, currWeek] = getWeekNumber(now);
+                
+                if (lastYear !== currYear || lastWeek !== currWeek) {
+                    shouldReset = true;
+                }
+            }
+
+            if (shouldReset) {
                 setAnalysisCount(0);
                 setLastAnalysisReset(now.toISOString());
             } else {
@@ -571,15 +599,24 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (file) {
       // Check Usage Limits
-      const isGuest = !session?.user?.email;
-      const limit = isGuest ? 1 : 3; // Monthly limit: 1 for Guest, 3 for Free
-      
-      // Note: In a real app, we would check subscription status here.
-      // For now, we enforce Free/Guest limits.
-      if (analysisCount >= limit) {
-          e.target.value = ""; // Reset input
-          setShowProModal(true);
-          return;
+      // Simplified and robust logic to distinguish Guest vs Logged-in User
+      if (!session?.user) {
+        // Guest (Not Logged In) -> Limit: 1 per month
+        if (analysisCount >= 1) {
+             console.log('Guest limit reached, showing Login Modal');
+             e.target.value = ""; // Reset input
+             setShowLoginModal(true);
+             return;
+        }
+      } else {
+        // Logged In User (Free) -> Limit: 1 per week
+        // Assuming all logged-in users are Free for now
+        if (analysisCount >= 1) {
+            console.log('Free User limit reached, showing Pro Modal');
+            e.target.value = ""; // Reset input
+            setShowProModal(true);
+            return;
+        }
       }
 
       const imageUrl = URL.createObjectURL(file);
@@ -2052,7 +2089,10 @@ export default function Home() {
                             👋
                         </div>
                         <h2 className="text-xl font-black text-slate-900 mb-2">歡迎來到畫重點</h2>
-                        <p className="text-sm text-slate-500">登入以保存您的創作與學習紀錄</p>
+                        <p className="text-sm text-slate-500">
+                             感謝你喜歡我們的平台，<br/>
+                             加入會員可享有一周一次(一個月四次)的免費使用機會
+                        </p>
                     </div>
 
                     <div className="space-y-3">
@@ -2117,6 +2157,18 @@ export default function Home() {
                 </button>
                 
                 <div className="p-6 pt-12">
+                    {/* Free Limit Warning */}
+                    <div className="text-center mb-6">
+                         <div className="inline-block bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-xs font-bold mb-3">
+                             免費額度已用完
+                         </div>
+                         <h3 className="text-lg font-black text-slate-900 mb-2">本週免費額度已用完</h3>
+                         <p className="text-sm text-slate-500">
+                             升級 Plus 方案，每天都能獲得專業指導<br/>
+                             讓進步不再受限！
+                         </p>
+                    </div>
+
                     {/* Plan Toggles */}
                     <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative">
                         <button 
