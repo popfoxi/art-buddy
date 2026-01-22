@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
+import { SUPPORT_CATEGORIES } from "@/lib/constants";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -48,7 +49,8 @@ export default function AdminPage() {
     totalAnalysis: 0,
     totalCredits: 0,
     recentUsers: [] as any[],
-    analysisTrend: [] as { date: string, general: number, master: number, total: number }[]
+    trend7d: [] as { date: string, general: number, master: number, total: number }[],
+    trendMonthly: [] as { date: string, general: number, master: number, total: number }[]
   });
   const [users, setUsers] = useState<any[]>([]);
   const [tickets, setTickets] = useState<any[]>([]);
@@ -279,9 +281,15 @@ export default function AdminPage() {
   const isUserAdmin = session?.user?.email === adminEmail || session?.user?.role === 'admin';
 
   // Chart Data Preparation
-  const chartData = (stats.analysisTrend && stats.analysisTrend.length > 0)
-    ? (analysisTimeRange === '7d' ? stats.analysisTrend.slice(-7) : stats.analysisTrend)
-    : Array(7).fill({ date: '', general: 0, master: 0, total: 0 });
+  const chartData = analysisTimeRange === '7d' 
+    ? (stats.trend7d || [])
+    : (stats.trendMonthly || []);
+
+  const totalChartAnalysis = chartData.reduce((sum, d) => sum + d.total, 0);
+  const generalChartAnalysis = chartData.reduce((sum, d) => sum + d.general, 0);
+  const masterChartAnalysis = chartData.reduce((sum, d) => sum + d.master, 0);
+  const generalRatio = totalChartAnalysis > 0 ? Math.round((generalChartAnalysis / totalChartAnalysis) * 100) : 0;
+  const masterRatio = totalChartAnalysis > 0 ? Math.round((masterChartAnalysis / totalChartAnalysis) * 100) : 0;
 
   const maxCount = Math.max(...chartData.map(d => d.total), 10);
   
@@ -430,11 +438,28 @@ export default function AdminPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">AI 分析次數趨勢</h3>
-                    <p className="text-sm text-slate-500 mt-1">
-                      共 {chartData.reduce((a, b) => a + b.total, 0)} 次分析 
-                      (一般: {chartData.reduce((a, b) => a + b.general, 0)} | 
-                       大師: {chartData.reduce((a, b) => a + b.master, 0)})
-                    </p>
+                    {(() => {
+                        const total = chartData.reduce((a, b) => a + b.total, 0);
+                        const general = chartData.reduce((a, b) => a + b.general, 0);
+                        const master = chartData.reduce((a, b) => a + b.master, 0);
+                        const gPct = total ? Math.round((general / total) * 100) : 0;
+                        const mPct = total ? Math.round((master / total) * 100) : 0;
+                        
+                        return (
+                            <div className="flex items-center gap-4 mt-2">
+                                <div className="text-sm text-slate-500 font-bold">總計 {total} 次</div>
+                                <div className="h-4 w-px bg-slate-200"></div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                                    <span className="text-sm font-bold text-slate-700">一般 {gPct}% ({general})</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                    <span className="text-sm font-bold text-slate-700">大師 {mPct}% ({master})</span>
+                                </div>
+                            </div>
+                        );
+                    })()}
                   </div>
                   <div className="flex bg-slate-100 p-1 rounded-lg self-start">
                     <button 
@@ -453,7 +478,7 @@ export default function AdminPage() {
                         analysisTimeRange === '30d' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                       )}
                     >
-                      近 30 天
+                      月報表 (6M)
                     </button>
                   </div>
                 </div>
@@ -487,7 +512,9 @@ export default function AdminPage() {
                         <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
                             {/* Tooltip */}
                             <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-slate-900 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap shadow-lg">
-                              <div className="font-bold mb-1">{new Date(data.date).toLocaleDateString()}</div>
+                              <div className="font-bold mb-1">
+                                {new Date(data.date).toLocaleDateString(undefined, analysisTimeRange === '30d' ? {year: 'numeric', month: 'long'} : {month: 'numeric', day: 'numeric'})}
+                              </div>
                               <div>總計: {data.total}</div>
                               <div className="text-blue-300">一般: {data.general}</div>
                               <div className="text-purple-300">大師: {data.master}</div>
@@ -506,7 +533,7 @@ export default function AdminPage() {
                                 ></div>
                             </div>
                             <span className="text-[10px] md:text-xs font-bold text-slate-400 hidden md:block">
-                              {idx % (analysisTimeRange === '30d' ? 5 : 1) === 0 ? new Date(data.date).toLocaleDateString(undefined, {month:'numeric', day:'numeric'}) : ''}
+                              {new Date(data.date).toLocaleDateString(undefined, analysisTimeRange === '30d' ? {year: '2-digit', month:'numeric'} : {month:'numeric', day:'numeric'})}
                             </span>
                         </div>
                     ))}
@@ -742,7 +769,7 @@ export default function AdminPage() {
                                     value={settings["ga4_id"] || ""}
                                     onChange={(e) => setSettings(prev => ({ ...prev, "ga4_id": e.target.value }))}
                                     placeholder="G-XXXXXXXXXX"
-                                    className="flex-1 md:w-64 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                                    className="flex-1 w-full max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
                                 />
                                 <button 
                                     onClick={() => handleSaveSetting("ga4_id", settings["ga4_id"] || "")}
@@ -772,7 +799,7 @@ export default function AdminPage() {
                                     value={settings["adsense_id"] || ""}
                                     onChange={(e) => setSettings(prev => ({ ...prev, "adsense_id": e.target.value }))}
                                     placeholder="pub-XXXXXXXXXXXXXXXX"
-                                    className="flex-1 md:w-64 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                                    className="flex-1 w-full max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
                                 />
                                 <button 
                                     onClick={() => handleSaveSetting("adsense_id", settings["adsense_id"] || "")}
@@ -819,13 +846,18 @@ export default function AdminPage() {
             {/* Tag Filter */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-4">
                 <Filter size={20} className="text-slate-400" />
-                <input 
-                    type="text" 
+                <select 
                     value={ticketTagFilter}
                     onChange={(e) => setTicketTagFilter(e.target.value)}
-                    placeholder="輸入標籤進行篩選 (例如: bug, refund)..." 
-                    className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 placeholder:font-normal" 
-                />
+                    className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 cursor-pointer" 
+                >
+                    <option value="">所有分類 (All Categories)</option>
+                    {SUPPORT_CATEGORIES.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                            {cat.label}
+                        </option>
+                    ))}
+                </select>
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -860,11 +892,14 @@ export default function AdminPage() {
                                     <td className="p-4">
                                         <div className="flex flex-wrap gap-1">
                                             {ticket.tags && ticket.tags.length > 0 ? (
-                                                ticket.tags.map((tag: string, idx: number) => (
-                                                    <span key={idx} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
-                                                        {tag}
-                                                    </span>
-                                                ))
+                                                ticket.tags.map((tag: string, idx: number) => {
+                                                    const cat = SUPPORT_CATEGORIES.find(c => c.id === tag);
+                                                    return (
+                                                        <span key={idx} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
+                                                            {cat ? cat.label : tag}
+                                                        </span>
+                                                    );
+                                                })
                                             ) : (
                                                 <span className="text-slate-300 text-xs">-</span>
                                             )}
@@ -941,9 +976,15 @@ export default function AdminPage() {
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Activity size={18} /></div>
-                        <span className="text-xs font-bold text-slate-500">今日分析</span>
+                        <span className="text-xs font-bold text-slate-500">分析比例 ({analysisTimeRange})</span>
                     </div>
-                    <div className="text-2xl font-black text-slate-900">{stats.todayAnalysis}</div>
+                    <div className="flex items-end gap-2">
+                         <div className="text-xl font-black text-slate-900">{generalRatio}%</div>
+                         <div className="text-xs text-slate-400 mb-1">一般</div>
+                         <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                         <div className="text-xl font-black text-slate-900">{masterRatio}%</div>
+                         <div className="text-xs text-slate-400 mb-1">大師</div>
+                    </div>
                 </div>
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-3 mb-2">
@@ -1241,26 +1282,33 @@ export default function AdminPage() {
                         {editingTicketTags.length === 0 ? (
                             <span className="text-slate-400 text-xs italic">尚未設定標籤</span>
                         ) : (
-                            editingTicketTags.map((tag) => (
-                                <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs font-bold shadow-sm">
-                                    {tag}
-                                    <button onClick={() => handleRemoveTag(tag)} className="text-slate-400 hover:text-red-500 transition-colors">
-                                        <X size={14} />
-                                    </button>
-                                </span>
-                            ))
+                            editingTicketTags.map((tag) => {
+                                const cat = SUPPORT_CATEGORIES.find(c => c.id === tag);
+                                return (
+                                    <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs font-bold shadow-sm">
+                                        {cat ? cat.label : tag}
+                                        <button onClick={() => handleRemoveTag(tag)} className="text-slate-400 hover:text-red-500 transition-colors">
+                                            <X size={14} />
+                                        </button>
+                                    </span>
+                                );
+                            })
                         )}
                     </div>
 
                     <div className="flex gap-2">
-                        <input 
-                            type="text" 
+                        <select 
                             value={newTagInput}
                             onChange={(e) => setNewTagInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                            placeholder="輸入新標籤名稱..."
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
-                        />
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all cursor-pointer"
+                        >
+                            <option value="">選擇分類...</option>
+                            {SUPPORT_CATEGORIES.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                    {cat.label}
+                                </option>
+                            ))}
+                        </select>
                         <button 
                             onClick={handleAddTag}
                             className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all"

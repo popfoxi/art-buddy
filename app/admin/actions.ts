@@ -66,9 +66,10 @@ export async function getAdminStats() {
   });
   const totalCredits = usersWithCredits.reduce((sum, user) => sum + (user.credits || 0), 0);
 
-  // 4. Analysis Trend (Last 30 Days)
-  const analysisTrend = [];
-  for (let i = 29; i >= 0; i--) {
+  // 4. Analysis Trend
+  // 7 Days (Daily)
+  const trend7d = [];
+  for (let i = 6; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     date.setHours(0, 0, 0, 0);
@@ -82,7 +83,33 @@ export async function getAdminStats() {
       where: { createdAt: { gte: date, lt: nextDate }, type: "master_style" },
     });
 
-    analysisTrend.push({
+    trend7d.push({
+      date: date.toISOString(),
+      general: generalCount,
+      master: masterCount,
+      total: generalCount + masterCount
+    });
+  }
+
+  // Monthly Trend (Last 6 Months)
+  const trendMonthly = [];
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    date.setDate(1);
+    date.setHours(0, 0, 0, 0);
+    
+    const nextDate = new Date(date);
+    nextDate.setMonth(date.getMonth() + 1);
+    
+    const generalCount = await prisma.analysis.count({
+      where: { createdAt: { gte: date, lt: nextDate }, type: { not: "master_style" } },
+    });
+    const masterCount = await prisma.analysis.count({
+      where: { createdAt: { gte: date, lt: nextDate }, type: "master_style" },
+    });
+
+    trendMonthly.push({
       date: date.toISOString(),
       general: generalCount,
       master: masterCount,
@@ -111,7 +138,8 @@ export async function getAdminStats() {
     todayAnalysis,
     totalAnalysis,
     totalCredits,
-    analysisTrend,
+    trend7d,
+    trendMonthly,
     recentUsers: recentUsers.map((u: any) => ({
       ...u,
       provider: u.accounts[0]?.provider || "email",

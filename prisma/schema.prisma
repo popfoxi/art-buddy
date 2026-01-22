@@ -19,7 +19,10 @@ model User {
   image         String?
   role          String    @default("user") // "user" | "admin"
   plan          String    @default("free") // "free" | "plus" | "pro"
-  credits       Int       @default(3)      // Free credits for new users
+  credits       Int       @default(0)      // Extra/Add-on credits (purchased separately)
+  subscriptionCredits Int @default(0)      // Monthly/Period credits from subscription
+  subscriptionExpiresAt DateTime?          // When the subscription credits expire/renew
+  trialStartedAt DateTime?                 // When the free trial started
   lastLogin     DateTime? // Last login timestamp
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -74,6 +77,9 @@ model Analysis {
   score     Int?     // The score given by AI
   result    String?  @db.Text // Full analysis text
   type      String   @default("general") // general (medium analysis), master_style (style challenge)
+  mediaId   String?  // e.g. "watercolor"
+  styleId   String?  // e.g. "loish_style"
+  scenarioId String? // e.g. "style_practice"
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

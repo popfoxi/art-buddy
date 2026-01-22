@@ -30,12 +30,18 @@ import {
     CheckCircle2,
     Mail,
     Heart,
-    MessageSquare
+    MessageSquare,
+    Target,
+    BookOpen,
+    ChevronDown
   } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { createTicket, getUserTickets, getUserCredits, decrementUserCredits } from "@/app/actions";
+import { MEDIA_MODULES, STYLE_MODULES } from "@/lib/modules";
+import { SUPPORT_CATEGORIES } from "@/lib/constants";
+import { sendGAEvent } from "@/lib/gtag";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -62,6 +68,7 @@ export default function Home() {
   // Challenge State
   const [userChallenges, setUserChallenges] = useState<any[]>([]);
   const [currentChallengeId, setCurrentChallengeId] = useState<string | null>(null);
+  const [showChallengeIntro, setShowChallengeIntro] = useState(false);
 
   // Favorites State
   const [favoriteArtworkIds, setFavoriteArtworkIds] = useState<number[]>([]);
@@ -69,12 +76,35 @@ export default function Home() {
   // Usage Limit State
   const [analysisCount, setAnalysisCount] = useState(0);
   const [lastAnalysisReset, setLastAnalysisReset] = useState<string | null>(null);
-  const [credits, setCredits] = useState<number>(0);
+  const [usageStats, setUsageStats] = useState<{
+    total: number;
+    subscriptionCredits: number;
+    credits: number;
+    plan: string;
+    isTrialExpired: boolean;
+    trialStartedAt: Date | null;
+    subscriptionExpiresAt: Date | null;
+  }>({ 
+    total: 0, 
+    subscriptionCredits: 0, 
+    credits: 0, 
+    plan: 'free', 
+    isTrialExpired: false, 
+    trialStartedAt: null,
+    subscriptionExpiresAt: null
+  });
 
   // Fetch credits from server
   useEffect(() => {
     if (session?.user?.id) {
-        getUserCredits().then(setCredits).catch(console.error);
+        getUserCredits().then((data: any) => {
+             if (typeof data === 'number') {
+                 // Backward compatibility
+                 setUsageStats(prev => ({ ...prev, total: data, credits: data }));
+             } else {
+                 setUsageStats(data);
+             }
+        }).catch(console.error);
     }
   }, [session, activeTab]); // Refresh when tab changes (e.g. after profile update)
 
@@ -181,9 +211,11 @@ export default function Home() {
   // Support Modal States
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
+  const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketContent, setTicketContent] = useState("");
+  const [ticketCategory, setTicketCategory] = useState<string>(SUPPORT_CATEGORIES[0].id);
 
   useEffect(() => {
     if (showSupportModal && session?.user) {
@@ -195,9 +227,11 @@ export default function Home() {
     if (!ticketSubject.trim() || !ticketContent.trim()) return;
     setIsCreatingTicket(true);
     try {
-        await createTicket(ticketSubject, ticketContent);
+        await createTicket(ticketSubject, ticketContent, ticketCategory);
+        sendGAEvent('submit_ticket', 'support', ticketCategory);
         setTicketSubject("");
         setTicketContent("");
+        setTicketCategory(SUPPORT_CATEGORIES[0].id);
         setIsCreatingTicket(false);
         // Refresh tickets
         const updatedTickets = await getUserTickets();
@@ -274,6 +308,16 @@ export default function Home() {
 
   const analyzeWithAI = async (base64Image: string) => {
     try {
+      // Determine scenario based on context
+      let scenarioId = 'free_practice';
+      if (currentChallengeId) {
+        scenarioId = 'challenge';
+      } else if (selectedStyle) {
+        scenarioId = 'style_practice';
+      }
+
+      sendGAEvent('analyze_start', 'analysis', scenarioId);
+
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: {
@@ -281,17 +325,26 @@ export default function Home() {
         },
         body: JSON.stringify({ 
           image: base64Image,
-          style: selectedStyle 
+          styleId: selectedStyle || 'general',
+          mediaId: selectedMedium || 'watercolor',
+          scenarioId: scenarioId
         }),
       });
 
       if (!response.ok) {
+        if (response.status === 403) {
+            sendGAEvent('show_pro_modal', 'conversion', 'limit_reached_api');
+            setShowProModal(true);
+            return null;
+        }
         throw new Error("API Request Failed");
       }
 
+      sendGAEvent('analyze_success', 'analysis', scenarioId);
       return await response.json();
     } catch (error) {
       console.error("AI Analysis Error:", error);
+      sendGAEvent('analyze_error', 'analysis', error instanceof Error ? error.message : 'Unknown Error');
       alert("AI 分析出了點小問題，請稍後再試。");
       return null;
     }
@@ -310,17 +363,22 @@ export default function Home() {
         prompt: artwork.prompt,
         startTime: new Date().toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
         status: 'in_progress', // in_progress, completed, abandoned
+        styleId: artwork.styleId || 'general',
+        mediaId: artwork.mediaId || artwork.medium || 'watercolor',
         result: null
     };
 
     setUserChallenges(prev => [newChallenge, ...prev]);
     setCurrentChallengeId(newChallengeId);
 
-    setSelectedStyle(artwork.master);
+    setSelectedStyle(artwork.styleId || artwork.master);
+    // Explicitly set the medium for the analysis API
+    setSelectedMedium(artwork.mediaId || artwork.medium || 'watercolor');
     setReferenceArtwork(artwork);
     setSelectedArtwork(null);
-    setActiveTab("challenge");
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Show Challenge Intro Overlay
+    setShowChallengeIntro(true);
   };
 
   const handleAbandonChallenge = (challengeId: string) => {
@@ -454,7 +512,9 @@ export default function Home() {
       id: 10,
       title: "角色插畫",
       master: "Loish",
+      styleId: "loish_style",
       medium: "digital",
+      mediaId: "digital_painting",
       imageUrl: "/images/explore/10.jpg",
       prompt: "Loish style digital painting, female portrait, flowing hair, soft glowing colors, digital art, stylized proportions, dreamy atmosphere",
       description: "【技巧】柔和上色、簡化線稿。 【注意】線稿不要太重，先鋪大色塊，陰影柔化。",
@@ -685,20 +745,22 @@ export default function Home() {
       console.log("File uploaded:", file.name); // Debug: Check filename for issues (e.g. HEIC/Apple formats)
       
       // Check Usage Limits
-      // Simplified and robust logic to distinguish Guest vs Logged-in User
       if (!session?.user) {
         // Guest (Not Logged In) -> Limit: 1 per month
         if (analysisCount >= 1) {
              console.log('Guest limit reached, showing Login Modal');
+             sendGAEvent('show_login_modal', 'conversion', 'limit_reached_guest');
              e.target.value = ""; // Reset input
              setShowLoginModal(true);
              return;
         }
       } else {
-        // Logged In User (Free) -> Limit: 1 per week
-        // Assuming all logged-in users are Free for now
-        if (analysisCount >= 1) {
-            console.log('Free User limit reached, showing Pro Modal');
+        // Logged In User -> Check Server Stats
+        // If total <= 0 AND user cannot start a trial, block.
+        // If user CAN start a trial (canStartTrial is true), allow them to proceed (API will init trial).
+        if (usageStats.total <= 0 && !usageStats.canStartTrial) {
+            console.log('User usage limit reached, showing Pro Modal');
+            sendGAEvent('show_pro_modal', 'conversion', 'limit_reached_user');
             e.target.value = ""; // Reset input
             setShowProModal(true);
             return;
@@ -711,17 +773,24 @@ export default function Home() {
       
       // If uploading from Challenge tab but ID is lost, try to recover it from active challenges
       if (isChallengeSource && !effectiveChallengeId && selectedStyle) {
-          const activeChallenge = userChallenges.find(c => c.status === 'in_progress' && c.master === selectedStyle);
+          const activeChallenge = userChallenges.find(c => c.status === 'in_progress' && c.styleId === selectedStyle);
           if (activeChallenge) {
               effectiveChallengeId = activeChallenge.id;
               setCurrentChallengeId(effectiveChallengeId);
+              // Ensure medium is consistent with the challenge
+              if (!selectedMedium || selectedMedium !== (activeChallenge.mediaId || activeChallenge.medium)) {
+                  setSelectedMedium(activeChallenge.mediaId || activeChallenge.medium || 'watercolor');
+              }
           }
-      }
+       }
 
       // If NOT in challenge mode, trigger global modal
       if (!effectiveChallengeId) {
         setSelectedImage(imageUrl);
         setResult(null); 
+      } else {
+        // In challenge mode, still update selectedImage so the preview works
+        setSelectedImage(imageUrl);
       }
       
       setIsAnalyzing(true);
@@ -732,13 +801,13 @@ export default function Home() {
         if (aiResult) {
             setAnalysisCount(prev => prev + 1);
 
-            // Decrement credits for logged-in users
+            // Refresh credits for logged-in users
             if (session?.user) {
                 try {
-                    await decrementUserCredits();
-                    setCredits(prev => Math.max(0, prev - 1));
+                    const updatedStats: any = await getUserCredits();
+                    setUsageStats(updatedStats);
                 } catch (err) {
-                    console.error("Failed to decrement credit", err);
+                    console.error("Failed to refresh credits", err);
                 }
             }
 
@@ -750,14 +819,14 @@ export default function Home() {
             // Save to History
             const newHistoryItem = {
               date: new Date().toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-              score: aiResult.score,
+              score: aiResult.total_score || aiResult.score,
               title: selectedStyle ? `風格練習：${selectedStyle}` : "自由創作",
-              tags: aiResult.feedback.slice(0, 2).map((f: any) => f.title),
+              tags: aiResult.step3_techniques || (aiResult.feedback ? aiResult.feedback.slice(0, 2).map((f: any) => f.title) : []),
               imageUrl: imageUrl,
-              preview: aiResult.encouragement,
-              analysis: aiResult.analysis,
-              feedback: aiResult.feedback,
-              detectedStyle: aiResult.detectedStyle
+              preview: aiResult.step1_declaration || aiResult.encouragement,
+              analysis: aiResult.step2_performance ? JSON.stringify(aiResult.step2_performance) : aiResult.analysis,
+              feedback: aiResult.step4_advice || aiResult.feedback,
+              detectedStyle: aiResult.step1_declaration || aiResult.detectedStyle
             };
             setHistoryItems(prev => [newHistoryItem, ...prev]);
 
@@ -770,9 +839,9 @@ export default function Home() {
                             status: 'completed',
                             completedTime: new Date().toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
                             result: {
-                                score: aiResult.score,
+                                score: aiResult.total_score || aiResult.score,
                                 imageUrl: imageUrl, // User's uploaded image
-                                analysis: aiResult.analysis
+                                analysis: aiResult.step2_performance ? JSON.stringify(aiResult.step2_performance) : aiResult.analysis
                             }
                         };
                     }
@@ -787,12 +856,17 @@ export default function Home() {
              // Handle error
              if (!effectiveChallengeId) {
                 setResult({
-                    detectedStyle: "分析失敗",
-                    confidence: 0,
-                    analysis: "AI 無法分析此圖片，請檢查網路連線或稍後再試。",
-                    score: 0,
-                    encouragement: "請稍後再試",
-                    feedback: []
+                    step1_declaration: "分析失敗",
+                    step2_performance: { representation: "-", driver: "-", atmosphere: "-" },
+                    step3_techniques: [],
+                    step4_advice: [],
+                    step5_scoring: { 
+                        media_mastery: { score: 0, reason: "請檢查網路" },
+                        structure_proportion: { score: 0, reason: "" },
+                        style_consistency: { score: 0, reason: "" },
+                        visual_completeness: { score: 0, reason: "" }
+                    },
+                    total_score: 0
                 });
              } else {
                  alert("分析失敗，請稍後再試");
@@ -1593,6 +1667,8 @@ export default function Home() {
                                                         onClick={() => {
                                                             // Resume challenge
                                                             setSelectedStyle(challenge.master);
+                                                            // Restore medium for analysis
+                                                            setSelectedMedium(challenge.mediaId || challenge.medium || 'watercolor');
                                                             setReferenceArtwork({
                                                                 id: challenge.galleryId,
                                                                 title: challenge.title,
@@ -1603,6 +1679,7 @@ export default function Home() {
                                                                 description: exploreGallery.find(g => g.id === challenge.galleryId)?.description || ""
                                                             });
                                                             setCurrentChallengeId(challenge.id);
+                                                            setShowChallengeIntro(true); // Show learning focus again
                                                             window.scrollTo({ top: 0, behavior: 'smooth' });
                                                         }}
                                                         className="text-xs bg-rose-600 text-white px-4 py-1.5 rounded-full font-bold hover:bg-rose-700 transition-colors shadow-sm shadow-rose-200"
@@ -1655,7 +1732,9 @@ export default function Home() {
                             <h2 className="text-lg font-black text-slate-900">{session?.user?.name || "訪客用戶"}</h2>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
-                                    {session ? "免費會員" : "訪客"}
+                                    {!session ? "訪客" : 
+                                      usageStats.plan === 'plus' ? "進階會員" : 
+                                      usageStats.plan === 'pro' ? "PRO 會員" : "免費會員"}
                                 </span>
                                 {session?.user?.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL && (
                                     <Link href="/admin">
@@ -1666,11 +1745,20 @@ export default function Home() {
                                 )}
                                 <span className="text-[10px] text-rose-500 font-bold">
                                     {session 
-                                        ? `剩餘點數 ${credits} 點` 
+                                        ? usageStats.total > 0 
+                                            ? `剩餘 ${usageStats.total} 次${usageStats.isTrialExpired && usageStats.credits > 0 ? ' (加購)' : usageStats.plan === 'free' && !usageStats.isTrialExpired ? ' (試用)' : ''}`
+                                            : usageStats.plan === 'free' && usageStats.isTrialExpired 
+                                                ? "試用已結束"
+                                                : `剩餘 ${usageStats.total} 次` 
                                         : `本月剩餘 ${Math.max(0, 1 - analysisCount)} 次`
                                     }
                                 </span>
                             </div>
+                            {session && usageStats.plan === 'free' && usageStats.trialStartedAt && !usageStats.isTrialExpired && (
+                                <div className="text-[10px] text-slate-400 mt-1">
+                                    試用期剩餘 {Math.max(0, Math.ceil((new Date(new Date(usageStats.trialStartedAt).getTime() + 7 * 86400000).getTime() - Date.now()) / 86400000))} 天
+                                </div>
+                            )}
                         </div>
                     </div>
                     {!session && (
@@ -1793,6 +1881,97 @@ export default function Home() {
         )}
 
       </div>
+
+      {/* Challenge Intro Overlay */}
+      {showChallengeIntro && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-slideUp relative">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-bl-full -mr-10 -mt-10 opacity-50 z-0"></div>
+                
+                <div className="p-6 relative z-10">
+                    <div className="flex justify-center mb-6">
+                        <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center shadow-inner">
+                             <Target size={32} />
+                        </div>
+                    </div>
+                    
+                    <h2 className="text-xl font-black text-slate-900 text-center mb-2">本次挑戰學習重點</h2>
+                    <p className="text-sm text-slate-500 text-center mb-6">
+                        AI 老師將重點觀察以下項目，請加油！
+                    </p>
+
+                    <div className="space-y-4 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                        {/* Media Techniques */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 text-rose-600 font-bold text-sm">
+                                <Brush size={14} />
+                                <span>媒介技法 ({MEDIA_MODULES[selectedMedium || 'watercolor']?.name || '水彩'})</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {(MEDIA_MODULES[selectedMedium || 'watercolor']?.core_techniques || []).slice(0, 3).map((t, i) => (
+                                    <span key={i} className="text-xs bg-white border border-rose-100 text-slate-600 px-2 py-1 rounded-lg shadow-sm">
+                                        {t}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Style Techniques */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 text-rose-600 font-bold text-sm">
+                                <Sparkles size={14} />
+                                <span>風格技法 ({STYLE_MODULES[selectedStyle || 'general']?.name || selectedStyle || '通用'})</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {(STYLE_MODULES[selectedStyle || 'general']?.core_features || []).slice(0, 3).map((t, i) => (
+                                    <span key={i} className="text-xs bg-white border border-rose-100 text-slate-600 px-2 py-1 rounded-lg shadow-sm">
+                                        {t}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Structure Focus */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 text-rose-600 font-bold text-sm">
+                                <Scan size={14} />
+                                <span>結構重點</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {(STYLE_MODULES[selectedStyle || 'general']?.focus_priority || []).slice(0, 3).map((t, i) => (
+                                    <span key={i} className="text-xs bg-white border border-rose-100 text-slate-600 px-2 py-1 rounded-lg shadow-sm">
+                                        {t}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-3">
+                    <button 
+                        onClick={() => {
+                            setShowChallengeIntro(false);
+                        }}
+                        className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors"
+                    >
+                        稍後再說
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setShowChallengeIntro(false);
+                            setActiveTab("challenge");
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 flex items-center justify-center gap-2"
+                    >
+                        <Zap size={16} />
+                        開始挑戰
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* Result Preview (Global) */}
       {selectedImage && (
@@ -2535,6 +2714,24 @@ export default function Home() {
                                     建立新提問
                                 </h3>
                                 <div className="space-y-3">
+                                    {/* Category Select */}
+                                    <div className="relative">
+                                        <select
+                                            value={ticketCategory}
+                                            onChange={(e) => setTicketCategory(e.target.value)}
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all appearance-none font-bold text-slate-700"
+                                        >
+                                            {SUPPORT_CATEGORIES.map((cat) => (
+                                                <option key={cat.id} value={cat.id}>
+                                                    {cat.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                            <ChevronDown size={16} />
+                                        </div>
+                                    </div>
+                                    
                                     <input 
                                         type="text" 
                                         value={ticketSubject}
@@ -2573,40 +2770,89 @@ export default function Home() {
                                 ) : (
                                     <div className="space-y-3">
                                         {supportTickets.map((ticket) => (
-                                            <div key={ticket.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="font-bold text-slate-900 text-sm">{ticket.subject}</div>
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                                        ticket.status === 'open' ? 'bg-green-100 text-green-600' :
-                                                        ticket.status === 'replied' ? 'bg-blue-100 text-blue-600' :
-                                                        'bg-slate-100 text-slate-500'
-                                                    }`}>
-                                                        {ticket.status === 'open' ? '處理中' :
-                                                         ticket.status === 'replied' ? '已回覆' : '已結案'}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-slate-600 mb-3 leading-relaxed bg-slate-50 p-3 rounded-xl">
-                                                    {ticket.content}
-                                                </p>
-                                                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                                                    <span>案件編號: #{ticket.id.slice(-6)}</span>
-                                                    <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
-                                                </div>
-                                                
-                                                {/* Reply Section */}
-                                                {ticket.reply && (
-                                                    <div className="mt-3 pt-3 border-t border-slate-100">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center text-[10px]">
-                                                                🤖
+                                            <div 
+                                                key={ticket.id} 
+                                                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                                            >
+                                                <div 
+                                                    className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
+                                                    onClick={() => setExpandedTicketId(expandedTicketId === ticket.id ? null : ticket.id)}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`
+                                                            w-2 h-2 rounded-full
+                                                            ${ticket.status === 'open' ? 'bg-green-500' :
+                                                              ticket.status === 'replied' ? 'bg-blue-500' :
+                                                              'bg-slate-300'}
+                                                        `} />
+                                                        <div>
+                                                            <div className="font-bold text-slate-900 text-sm">{ticket.subject}</div>
+                                                            <div className="text-[10px] text-slate-400 flex items-center gap-2">
+                                                                <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                                                                {ticket.tags && ticket.tags[0] && (
+                                                                    <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">
+                                                                        {SUPPORT_CATEGORIES.find(c => c.id === ticket.tags[0])?.label || ticket.tags[0]}
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                            <span className="text-xs font-bold text-slate-900">客服回覆</span>
-                                                        </div>
-                                                        <div className="bg-rose-50 p-3 rounded-xl text-xs text-slate-700 leading-relaxed border border-rose-100">
-                                                            {ticket.reply}
                                                         </div>
                                                     </div>
-                                                )}
+                                                    
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                                            ticket.status === 'open' ? 'bg-green-100 text-green-600' :
+                                                            ticket.status === 'replied' ? 'bg-blue-100 text-blue-600' :
+                                                            'bg-slate-100 text-slate-500'
+                                                        }`}>
+                                                            {ticket.status === 'open' ? '處理中' :
+                                                             ticket.status === 'replied' ? '已回覆' : '已結案'}
+                                                        </span>
+                                                        <ChevronDown 
+                                                            size={16} 
+                                                            className={`text-slate-400 transition-transform duration-200 ${expandedTicketId === ticket.id ? 'rotate-180' : ''}`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                
+                                                <AnimatePresence>
+                                                    {expandedTicketId === ticket.id && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: "auto", opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={{ duration: 0.2 }}
+                                                            className="border-t border-slate-100 bg-slate-50"
+                                                        >
+                                                            <div className="p-4 pt-2">
+                                                                <div className="mb-2">
+                                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">您的問題</span>
+                                                                    <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                                                                        {ticket.content}
+                                                                    </p>
+                                                                </div>
+
+                                                                <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-200/50 pt-2 mt-3">
+                                                                    <span>案件編號: #{ticket.id.slice(-6)}</span>
+                                                                </div>
+                                                                
+                                                                {/* Reply Section */}
+                                                                {ticket.reply && (
+                                                                    <div className="mt-3 pt-3 border-t border-slate-200/50">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                            <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center text-[10px]">
+                                                                                🤖
+                                                                            </div>
+                                                                            <span className="text-xs font-bold text-slate-900">客服回覆</span>
+                                                                        </div>
+                                                                        <div className="bg-white p-3 rounded-xl text-xs text-slate-700 leading-relaxed border border-rose-100 shadow-sm">
+                                                                            {ticket.reply}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
                                         ))}
                                     </div>
@@ -2794,4 +3040,90 @@ export default function Home() {
       </nav>
     </main>
   );
+}
+                                    .filter(artwork => favoriteArtworkIds.includes(artwork.id))
+                                    .filter(artwork => {
+                                        if (favoriteFilterType === "all") return true;
+                                        if (favoriteFilterType === "medium") return artwork.medium === favoriteFilterValue;
+                                        if (favoriteFilterType === "master") return artwork.master === favoriteFilterValue;
+                                        return true;
+                                    })
+                                    .map(artwork => (
+                                        <div 
+                                            key={artwork.id} 
+                                            onClick={() => {
+                                                setSelectedArtwork(artwork);
+                                                setIsFavoritesExpanded(false); // Close modal to show detail
+                                            }}
+                                            className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100"
+                                        >
+                                            <img 
+                                                src={artwork.imageUrl} 
+                                                alt={artwork.title} 
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                                                <p className="text-white text-xs font-bold line-clamp-1">{artwork.title}</p>
+                                                <p className="text-white/80 text-[10px]">{artwork.master}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 pb-20">
+                            <Heart size={48} className="mb-4 opacity-20" />
+                            <p className="text-sm font-bold">還沒有收藏的作品</p>
+                            <p className="text-xs mt-1">去探索頁面看看吧！</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 z-50">
+        <div className="max-w-md mx-auto h-20 grid grid-cols-5 items-center pb-4">
+          <button 
+            onClick={() => setActiveTab("home")}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "home" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <HomeIcon size={24} />
+            <span className="text-[10px] font-bold">首頁</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab("explore")}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "explore" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <Compass size={24} />
+            <span className="text-[10px] font-bold">探索</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab("challenge")}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "challenge" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <Trophy size={24} className={activeTab === "challenge" ? "fill-current" : ""} />
+            <span className="text-[10px] font-bold">挑戰</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab("history")}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "history" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <History size={24} />
+            <span className="text-[10px] font-bold">紀錄</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab("profile")}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "profile" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            <User size={24} />
+            <span className="text-[10px] font-bold">我的</span>
+          </button>
+        </div>
+      </nav>
+    </main>
+  );
+}
 }
