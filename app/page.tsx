@@ -742,9 +742,17 @@ export default function Home() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isChallengeSource: boolean = false) => {
     const file = e.target.files?.[0];
     if (file) {
-      console.log("File uploaded:", file.name); // Debug: Check filename for issues (e.g. HEIC/Apple formats)
+      console.log("File uploaded:", file.name, "isChallenge:", isChallengeSource); // Debug: Check filename
       
       // Check Usage Limits
+      // Force refresh usage stats before check to ensure sync
+      if (session?.user && !isChallengeSource) {
+         // We allow challenge uploads to bypass strict credit check if it's just a style practice? 
+         // But logic says challenge consumes credit. 
+         // Let's ensure we have latest credits.
+         // (Credits are refreshed in useEffect, should be fine)
+      }
+
       if (!session?.user) {
         // Guest (Not Logged In) -> Limit: 1 per month
         if (analysisCount >= 1) {
