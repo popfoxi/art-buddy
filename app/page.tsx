@@ -1539,7 +1539,7 @@ export default function Home() {
 
         {/* === PROFILE TAB === */}
         {activeTab === "profile" && (
-            <div className="space-y-6 animate-fadeIn pb-24">
+            <div className="space-y-6 animate-fadeIn pb-20">
                 <header className="mb-6">
                     <h1 className="text-2xl font-black text-slate-900">個人中心</h1>
                     <p className="text-slate-500 text-sm mt-1">管理你的帳號與設定</p>
@@ -1561,6 +1561,12 @@ export default function Home() {
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
                                     {session ? "會員" : "免費版"}
+                                </span>
+                                <span className="text-[10px] text-rose-500 font-bold">
+                                    {session 
+                                        ? `本週剩餘 ${Math.max(0, 1 - analysisCount)} 次` 
+                                        : `本月剩餘 ${Math.max(0, 1 - analysisCount)} 次`
+                                    }
                                 </span>
                             </div>
                         </div>
@@ -1666,7 +1672,7 @@ export default function Home() {
                     )}
                 </div>
                 
-                <div className="text-center text-[10px] text-slate-400 py-4">
+                <div className="text-center text-[10px] text-slate-400 pt-2 pb-4">
                     v1.1.0 • Build 2026.01.22
                 </div>
             </div>
