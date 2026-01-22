@@ -641,6 +641,8 @@ export default function Home() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isChallengeSource: boolean = false) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log("File uploaded:", file.name); // Debug: Check filename for issues (e.g. HEIC/Apple formats)
+      
       // Check Usage Limits
       // Simplified and robust logic to distinguish Guest vs Logged-in User
       if (!session?.user) {
@@ -1604,6 +1606,13 @@ export default function Home() {
                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
                                     {session ? "免費會員" : "訪客"}
                                 </span>
+                                {session?.user?.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL && (
+                                    <Link href="/admin">
+                                        <span className="text-[10px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full font-bold cursor-pointer hover:bg-rose-200 transition-colors">
+                                            管理員
+                                        </span>
+                                    </Link>
+                                )}
                                 <span className="text-[10px] text-rose-500 font-bold">
                                     {session 
                                         ? `本週剩餘 ${Math.max(0, 1 - analysisCount)} 次` 
