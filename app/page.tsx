@@ -2394,7 +2394,7 @@ export default function Home() {
                 <div className="p-4 flex-1 overflow-y-auto">
                     {favoriteArtworkIds.length > 0 ? (
                         <>
-                            <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar">
+                            <div className="flex flex-wrap gap-2 pb-4">
                                  <button 
                                      onClick={() => {
                                          setFavoriteFilterType("all");
