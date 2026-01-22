@@ -179,12 +179,55 @@ export default function Home() {
     });
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
+  const compressImage = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Max dimension limit to ensure reasonable payload size
+          const MAX_WIDTH = 1500;
+          const MAX_HEIGHT = 1500;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error("Failed to get canvas context"));
+            return;
+          }
+          
+          // Draw image on white background to handle transparency if any (though converting to JPEG)
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Compress to JPEG with 0.7 quality
+          // This ensures consistent format and smaller size
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
     });
   };
 
@@ -641,7 +684,7 @@ export default function Home() {
       setIsAnalyzing(true);
       
       try {
-        const base64 = await fileToBase64(file);
+        const base64 = await compressImage(file);
         const aiResult = await analyzeWithAI(base64);
         if (aiResult) {
             setAnalysisCount(prev => prev + 1);
@@ -1672,7 +1715,7 @@ export default function Home() {
                 </div>
                 
                 <div className="text-center text-[10px] text-slate-400 pt-2 pb-4">
-                    v1.2.1 • Build 2026.01.22-3
+                    v1.2.2 • Build 2026.01.22-4
                 </div>
             </div>
         )}
