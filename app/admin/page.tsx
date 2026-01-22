@@ -353,9 +353,10 @@ export default function AdminPage() {
                     <Database size={24} />
                 </div>
                 <div>
-                    <h3 className="text-emerald-900 font-bold text-lg mb-1">資料庫已連線</h3>
+                    <h3 className="text-emerald-900 font-bold text-lg mb-1">資料庫已連線 (Live)</h3>
                     <p className="text-emerald-700/80 text-sm leading-relaxed">
                         目前顯示為 <strong>Vercel Postgres (Neon)</strong> 真實數據。所有會員註冊與登入皆會即時更新。
+                        <br/><span className="text-xs opacity-70">系統版本: v1.2.0 (已啟用真實數據串接)</span>
                     </p>
                 </div>
             </div>
