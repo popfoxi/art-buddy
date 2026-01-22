@@ -88,7 +88,8 @@ export default function AdminPage() {
   if (status === "loading") return <div className="min-h-screen flex items-center justify-center bg-slate-50">載入中...</div>;
 
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-  const isUserAdmin = session?.user?.email === adminEmail;
+  // @ts-ignore - role is passed from session callback
+  const isUserAdmin = session?.user?.email === adminEmail || session?.user?.role === 'admin';
 
   // Mock Revenue Data (until real payments are integrated)
   // Use real analysis trend data if available, otherwise fallback to 0s
@@ -107,7 +108,7 @@ export default function AdminPage() {
             <p className="text-slate-500">請登入以存取管理後台</p>
           </div>
           <Link 
-            href="/api/auth/signin" 
+            href="/api/auth/signin?callbackUrl=/admin" 
             className="block w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 active:scale-[0.98]"
           >
             登入帳號
@@ -126,7 +127,7 @@ export default function AdminPage() {
             <Shield size={64} className="text-slate-300 mb-4" />
             <h1 className="text-2xl font-bold text-slate-900 mb-2">權限不足</h1>
             <p className="text-slate-500 text-center max-w-md mb-8">
-              您目前的帳號 ({session?.user?.email}) 沒有管理員權限。
+              您目前的帳號 ({session?.user?.email || session?.user?.name}) 沒有管理員權限。
             </p>
             <div className="flex gap-4">
               <Link href="/api/auth/signin" className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold">切換帳號</Link>
