@@ -64,6 +64,10 @@ export default function Home() {
   // Favorites State
   const [favoriteArtworkIds, setFavoriteArtworkIds] = useState<number[]>([]);
 
+  // Usage Limit State
+  const [analysisCount, setAnalysisCount] = useState(0);
+  const [lastAnalysisReset, setLastAnalysisReset] = useState<string | null>(null);
+
   // Login Modal State
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -83,6 +87,20 @@ export default function Home() {
             setHistoryItems(data.history || []);
             setUserChallenges(data.challenges || []);
             setFavoriteArtworkIds(data.favorites || []);
+
+            // Usage Limit Logic (Monthly Reset)
+            const savedReset = data.lastAnalysisReset || new Date().toISOString();
+            const lastResetDate = new Date(savedReset);
+            const now = new Date();
+            
+            // Check if month has changed
+            if (lastResetDate.getMonth() !== now.getMonth() || lastResetDate.getFullYear() !== now.getFullYear()) {
+                setAnalysisCount(0);
+                setLastAnalysisReset(now.toISOString());
+            } else {
+                setAnalysisCount(data.analysisCount || 0);
+                setLastAnalysisReset(savedReset);
+            }
         } catch (e) {
             console.error("Failed to parse local storage", e);
         }
@@ -91,6 +109,8 @@ export default function Home() {
         setHistoryItems([]);
         setUserChallenges([]);
         setFavoriteArtworkIds([]);
+        setAnalysisCount(0);
+        setLastAnalysisReset(new Date().toISOString());
     }
     setIsLoaded(true);
   }, [session?.user?.email, status]);
@@ -103,18 +123,22 @@ export default function Home() {
     const data = {
         history: historyItems,
         challenges: userChallenges,
-        favorites: favoriteArtworkIds
+        favorites: favoriteArtworkIds,
+        analysisCount,
+        lastAnalysisReset
     };
     localStorage.setItem(key, JSON.stringify(data));
-  }, [historyItems, userChallenges, favoriteArtworkIds, session?.user?.email, isLoaded]);
+  }, [historyItems, userChallenges, favoriteArtworkIds, analysisCount, lastAnalysisReset, session?.user?.email, isLoaded]);
 
   const [favoriteFilterType, setFavoriteFilterType] = useState<"all" | "medium" | "master">("all");
   const [favoriteFilterValue, setFavoriteFilterValue] = useState<string | null>(null);
 
   // Profile Modal States
   const [showProModal, setShowProModal] = useState(false);
+  const [proPlanType, setProPlanType] = useState<"pro" | "pro_plus">("pro");
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(false);
 
   const toggleFavorite = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
@@ -546,6 +570,18 @@ export default function Home() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isChallengeSource: boolean = false) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Check Usage Limits
+      const isGuest = !session?.user?.email;
+      const limit = isGuest ? 1 : 3; // Monthly limit: 1 for Guest, 3 for Free
+      
+      // Note: In a real app, we would check subscription status here.
+      // For now, we enforce Free/Guest limits.
+      if (analysisCount >= limit) {
+          e.target.value = ""; // Reset input
+          setShowProModal(true);
+          return;
+      }
+
       const imageUrl = URL.createObjectURL(file);
       
       let effectiveChallengeId = currentChallengeId;
@@ -571,6 +607,8 @@ export default function Home() {
         const base64 = await fileToBase64(file);
         const aiResult = await analyzeWithAI(base64);
         if (aiResult) {
+            setAnalysisCount(prev => prev + 1);
+
             // If NOT in challenge mode, update global result
             if (!effectiveChallengeId) {
                 setResult(aiResult);
@@ -1526,12 +1564,7 @@ export default function Home() {
                         <div className="text-[10px] text-slate-400 font-bold mt-1">完成挑戰</div>
                     </button>
                     <button 
-                        onClick={() => {
-                            const gallery = document.getElementById('favorites-gallery');
-                            if (gallery) {
-                                gallery.scrollIntoView({ behavior: 'smooth' });
-                            }
-                        }}
+                        onClick={() => setIsFavoritesExpanded(true)}
                         className="bg-white p-3 rounded-2xl border border-slate-100 text-center hover:border-rose-200 hover:bg-rose-50/50 transition-all cursor-pointer"
                     >
                         <div className="text-2xl font-black text-slate-900">{favoriteArtworkIds.length}</div>
@@ -1539,135 +1572,11 @@ export default function Home() {
                     </button>
                 </div>
 
-                {/* Favorites Gallery */}
-                <div id="favorites-gallery" className="bg-white p-4 rounded-2xl border border-slate-100 scroll-mt-24">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-bold text-slate-900 flex items-center gap-2">
-                            <Heart size={18} className="text-rose-500 fill-rose-500" />
-                            我的收藏
-                        </h2>
-                        <span className="text-xs text-slate-400 font-medium">
-                            {favoriteArtworkIds.length} 作品
-                        </span>
-                    </div>
 
-                    {favoriteArtworkIds.length > 0 ? (
-                        <>
-                             {/* Favorite Filters */}
-                             <div className="mb-4 space-y-3">
-                                <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                                    <button 
-                                        onClick={() => {
-                                            setFavoriteFilterType("all");
-                                            setFavoriteFilterValue(null);
-                                        }}
-                                        className={`
-                                            px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border
-                                            ${favoriteFilterType === "all" 
-                                                ? "bg-slate-900 text-white border-slate-900" 
-                                                : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
-                                        `}
-                                    >
-                                        全部顯示
-                                    </button>
-                                    <div className="w-px h-6 bg-slate-200 mx-1 self-center" />
-                                    {Array.from(new Set(
-                                        exploreGallery
-                                            .filter(a => favoriteArtworkIds.includes(a.id))
-                                            .map(a => a.medium)
-                                    )).map(mediumId => {
-                                        const mediumName = artMediums.find(m => m.id === mediumId)?.name || mediumId;
-                                        return (
-                                            <button 
-                                                key={mediumId}
-                                                onClick={() => {
-                                                    setFavoriteFilterType("medium");
-                                                    setFavoriteFilterValue(mediumId);
-                                                }}
-                                                className={`
-                                                    px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1
-                                                    ${favoriteFilterType === "medium" && favoriteFilterValue === mediumId
-                                                        ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
-                                                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
-                                                `}
-                                            >
-                                                <span className="grayscale-[0.5]">{artMediums.find(m => m.id === mediumId)?.icon}</span>
-                                                {mediumName}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-                                     {Array.from(new Set(
-                                        exploreGallery
-                                            .filter(a => favoriteArtworkIds.includes(a.id))
-                                            .map(a => a.master)
-                                    )).map(master => (
-                                        <button 
-                                            key={master}
-                                            onClick={() => {
-                                                setFavoriteFilterType("master");
-                                                setFavoriteFilterValue(master);
-                                            }}
-                                            className={`
-                                                px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5
-                                                ${favoriteFilterType === "master" && favoriteFilterValue === master
-                                                    ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
-                                                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
-                                            `}
-                                        >
-                                            <User size={10} className={favoriteFilterType === "master" && favoriteFilterValue === master ? "text-rose-500" : "text-slate-400"} />
-                                            {master}
-                                        </button>
-                                    ))}
-                                </div>
-                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                {exploreGallery
-                                    .filter(artwork => favoriteArtworkIds.includes(artwork.id))
-                                    .filter(artwork => {
-                                        if (favoriteFilterType === "all") return true;
-                                        if (favoriteFilterType === "medium") return artwork.medium === favoriteFilterValue;
-                                        if (favoriteFilterType === "master") return artwork.master === favoriteFilterValue;
-                                        return true;
-                                    })
-                                    .map(artwork => (
-                                        <div 
-                                            key={artwork.id} 
-                                            onClick={() => setSelectedArtwork(artwork)}
-                                            className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100"
-                                        >
-                                            <img 
-                                                src={artwork.imageUrl} 
-                                                alt={artwork.title} 
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-                                                <p className="text-white text-xs font-bold line-clamp-1">{artwork.title}</p>
-                                                <p className="text-white/80 text-[10px]">{artwork.master}</p>
-                                            </div>
-                                        </div>
-                                    ))
-                                }
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
-                             <div className="flex justify-center mb-2">
-                                 <Heart size={32} className="opacity-20" />
-                             </div>
-                             <p className="text-sm font-medium text-slate-500">還沒有收藏作品</p>
-                             <p className="text-xs text-slate-400 mt-1">在探索頁面看到喜歡的畫作，點擊愛心即可收藏！</p>
-                             <button 
-                                onClick={() => setActiveTab("explore")}
-                                className="mt-4 text-xs bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-full font-bold hover:bg-slate-50 transition-colors shadow-sm"
-                             >
-                                去探索逛逛
-                             </button>
-                        </div>
-                    )}
-                </div>
+
+
+
 
                 {/* Menu List */}
                 <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
@@ -2208,28 +2117,56 @@ export default function Home() {
                     <X size={20} />
                 </button>
                 
-                <div className="p-6">
+                <div className="p-6 pt-12">
+                    {/* Plan Toggles */}
+                    <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative">
+                        <button 
+                            onClick={() => setProPlanType("pro")}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 ${proPlanType === "pro" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                        >
+                            Pro
+                        </button>
+                        <button 
+                            onClick={() => setProPlanType("pro_plus")}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 ${proPlanType === "pro_plus" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                        >
+                            Pro+
+                        </button>
+                    </div>
+
                     <div className="text-center mb-6">
                         <div className="w-16 h-16 bg-gradient-to-br from-rose-400 to-rose-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-200 transform rotate-3">
                             <Star size={32} fill="currentColor" />
                         </div>
-                        <h2 className="text-xl font-black text-slate-900 mb-1">升級 Pro 專業版</h2>
-                        <p className="text-sm text-slate-500">解鎖完整學習體驗</p>
+                        <h2 className="text-xl font-black text-slate-900 mb-1">
+                            {proPlanType === "pro" ? "每天一張，穩定進步" : "給真正認真學畫的人"}
+                        </h2>
+                        <p className="text-sm text-slate-500">
+                            {proPlanType === "pro" ? "適合建立繪畫習慣的你" : "適合追求極致細節的你"}
+                        </p>
                     </div>
 
                     <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-6">
                         <div className="flex items-baseline justify-center gap-1 mb-4">
-                            <span className="text-3xl font-black text-slate-900">$120</span>
+                            <span className="text-3xl font-black text-slate-900">
+                                {proPlanType === "pro" ? "$150" : "$300"}
+                            </span>
                             <span className="text-sm text-slate-500 font-bold">/ 月</span>
                         </div>
                         <ul className="space-y-3">
-                            {[
-                                "無限次 AI 作品分析",
-                                "專屬大師風格評分報告",
-                                "解鎖所有教學內容與技巧",
-                                "優先獲得新功能體驗",
-                                "去除所有廣告"
-                            ].map((feature, i) => (
+                            {(proPlanType === "pro" ? [
+                                "每月 30 次作品分析 (一天 1 次)",
+                                "解鎖所有畫風案例",
+                                "完整「畫風技巧＋臨摹重點」",
+                                "去除所有廣告",
+                                "新功能優先體驗"
+                            ] : [
+                                "每月 100 次作品分析 (一天 > 3 次)",
+                                "深度分析 (構圖 / 線條 / 明暗)",
+                                "可查看歷史分析紀錄",
+                                "無廣告＋完整內容",
+                                "專屬大師風格評分報告"
+                            ]).map((feature, i) => (
                                 <li key={i} className="flex items-center gap-3 text-sm text-slate-700">
                                     <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
                                         <CheckCircle2 size={12} />
@@ -2241,7 +2178,7 @@ export default function Home() {
                     </div>
 
                     <button className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 mb-3">
-                        立即升級
+                        立即升級 {proPlanType === "pro" ? "Pro" : "Pro+"}
                     </button>
                     <p className="text-center text-[10px] text-slate-400">
                         隨時可取消訂閱，不綁約
@@ -2377,6 +2314,139 @@ export default function Home() {
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* === FAVORITES MODAL === */}
+      {isFavoritesExpanded && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-slideUp relative h-[80vh] flex flex-col">
+                 <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
+                            <Heart size={16} fill="currentColor" />
+                        </div>
+                        <h2 className="text-lg font-black text-slate-900">收藏作品</h2>
+                        <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{favoriteArtworkIds.length}</span>
+                    </div>
+                    <button 
+                        onClick={() => setIsFavoritesExpanded(false)}
+                        className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <div className="p-4 flex-1 overflow-y-auto">
+                    {favoriteArtworkIds.length > 0 ? (
+                        <>
+                            <div className="flex gap-2 overflow-x-auto pb-4 hide-scrollbar">
+                                 <button 
+                                     onClick={() => {
+                                         setFavoriteFilterType("all");
+                                         setFavoriteFilterValue(null);
+                                     }}
+                                     className={`
+                                         px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border
+                                         ${favoriteFilterType === "all" 
+                                             ? "bg-slate-900 text-white border-slate-900" 
+                                             : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                     `}
+                                 >
+                                     全部顯示
+                                 </button>
+                                 <div className="w-px h-6 bg-slate-200 mx-1 self-center" />
+                                 {Array.from(new Set(
+                                     exploreGallery
+                                         .filter(a => favoriteArtworkIds.includes(a.id))
+                                         .map(a => a.medium)
+                                 )).map(mediumId => {
+                                     const mediumName = artMediums.find(m => m.id === mediumId)?.name || mediumId;
+                                     return (
+                                         <button 
+                                             key={mediumId}
+                                             onClick={() => {
+                                                 setFavoriteFilterType("medium");
+                                                 setFavoriteFilterValue(mediumId);
+                                             }}
+                                             className={`
+                                                 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1
+                                                 ${favoriteFilterType === "medium" && favoriteFilterValue === mediumId
+                                                     ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
+                                                     : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                             `}
+                                         >
+                                             <span className="grayscale-[0.5]">{artMediums.find(m => m.id === mediumId)?.icon}</span>
+                                             {mediumName}
+                                         </button>
+                                     );
+                                 })}
+                                 <div className="w-px h-6 bg-slate-200 mx-1 self-center" />
+                                 {Array.from(new Set(
+                                     exploreGallery
+                                         .filter(a => favoriteArtworkIds.includes(a.id))
+                                         .map(a => a.master)
+                                 )).map(master => (
+                                     <button 
+                                         key={master}
+                                         onClick={() => {
+                                             setFavoriteFilterType("master");
+                                             setFavoriteFilterValue(master);
+                                         }}
+                                         className={`
+                                             px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5
+                                             ${favoriteFilterType === "master" && favoriteFilterValue === master
+                                                 ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
+                                                 : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                         `}
+                                     >
+                                         <User size={10} className={favoriteFilterType === "master" && favoriteFilterValue === master ? "text-rose-500" : "text-slate-400"} />
+                                         {master}
+                                     </button>
+                                 ))}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pb-20">
+                                {exploreGallery
+                                    .filter(artwork => favoriteArtworkIds.includes(artwork.id))
+                                    .filter(artwork => {
+                                        if (favoriteFilterType === "all") return true;
+                                        if (favoriteFilterType === "medium") return artwork.medium === favoriteFilterValue;
+                                        if (favoriteFilterType === "master") return artwork.master === favoriteFilterValue;
+                                        return true;
+                                    })
+                                    .map(artwork => (
+                                        <div 
+                                            key={artwork.id} 
+                                            onClick={() => {
+                                                setSelectedArtwork(artwork);
+                                                setIsFavoritesExpanded(false); // Close modal to show detail
+                                            }}
+                                            className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100"
+                                        >
+                                            <img 
+                                                src={artwork.imageUrl} 
+                                                alt={artwork.title} 
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                                                <p className="text-white text-xs font-bold line-clamp-1">{artwork.title}</p>
+                                                <p className="text-white/80 text-[10px]">{artwork.master}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 pb-20">
+                            <Heart size={48} className="mb-4 opacity-20" />
+                            <p className="text-sm font-bold">還沒有收藏的作品</p>
+                            <p className="text-xs mt-1">去探索頁面看看吧！</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
