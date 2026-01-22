@@ -1630,7 +1630,7 @@ export default function Home() {
                 </div>
                 
                 <div className="text-center text-[10px] text-slate-400 py-4">
-                    v1.0.0 • Build 2026.01.21
+                    v1.1.0 • Build 2026.01.22
                 </div>
             </div>
         )}
