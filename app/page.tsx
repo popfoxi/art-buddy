@@ -29,11 +29,13 @@ import {
     Paintbrush,
     CheckCircle2,
     Mail,
-    Heart
+    Heart,
+    MessageSquare
   } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { createTicket, getUserTickets } from "@/app/actions";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -167,6 +169,37 @@ export default function Home() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(false);
+
+  // Support Modal States
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportTickets, setSupportTickets] = useState<any[]>([]);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketContent, setTicketContent] = useState("");
+
+  useEffect(() => {
+    if (showSupportModal && session?.user) {
+        getUserTickets().then(setSupportTickets);
+    }
+  }, [showSupportModal, session]);
+
+  const handleCreateTicket = async () => {
+    if (!ticketSubject.trim() || !ticketContent.trim()) return;
+    setIsCreatingTicket(true);
+    try {
+        await createTicket(ticketSubject, ticketContent);
+        setTicketSubject("");
+        setTicketContent("");
+        setIsCreatingTicket(false);
+        // Refresh tickets
+        const updatedTickets = await getUserTickets();
+        setSupportTickets(updatedTickets);
+    } catch (error) {
+        console.error("Failed to create ticket", error);
+        alert("發送失敗，請稍後再試");
+        setIsCreatingTicket(false);
+    }
+  };
 
   const toggleFavorite = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
@@ -1697,6 +1730,18 @@ export default function Home() {
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
                     <button 
+                        onClick={() => setShowSupportModal(true)}
+                        className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors border-b border-slate-50"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-green-50 text-green-500 flex items-center justify-center">
+                                <MessageSquare size={16} />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">線上客服</span>
+                        </div>
+                        <ChevronRight size={16} className="text-slate-300" />
+                    </button>
+                    <button 
                         onClick={() => setShowAboutModal(true)}
                         className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
                     >
@@ -2423,6 +2468,134 @@ export default function Home() {
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* === SUPPORT MODAL === */}
+      {showSupportModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-slideUp relative max-h-[85vh] flex flex-col">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-green-50 text-green-500 flex items-center justify-center">
+                            <MessageSquare size={16} fill="currentColor" />
+                        </div>
+                        <h2 className="text-lg font-black text-slate-900">線上客服</h2>
+                    </div>
+                    <button 
+                        onClick={() => setShowSupportModal(false)}
+                        className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <div className="p-4 flex-1 overflow-y-auto bg-slate-50">
+                    {!session ? (
+                         <div className="text-center py-12 text-slate-400">
+                             <MessageSquare size={48} className="mb-4 opacity-20 mx-auto" />
+                             <p className="text-sm font-bold">請先登入會員</p>
+                             <p className="text-xs mt-1">登入後即可使用線上客服功能</p>
+                             <button 
+                                 onClick={() => {
+                                     setShowSupportModal(false);
+                                     setShowLoginModal(true);
+                                 }}
+                                 className="mt-4 px-6 py-2 bg-slate-900 text-white rounded-full text-xs font-bold"
+                             >
+                                 前往登入
+                             </button>
+                         </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Create Ticket Form */}
+                            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                    <Sparkles size={16} className="text-green-500" />
+                                    建立新提問
+                                </h3>
+                                <div className="space-y-3">
+                                    <input 
+                                        type="text" 
+                                        value={ticketSubject}
+                                        onChange={(e) => setTicketSubject(e.target.value)}
+                                        placeholder="主旨 (例如：AI 分析失敗)"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                                    />
+                                    <textarea 
+                                        value={ticketContent}
+                                        onChange={(e) => setTicketContent(e.target.value)}
+                                        placeholder="請詳細描述您遇到的問題..."
+                                        className="w-full h-24 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all resize-none"
+                                    ></textarea>
+                                    <button 
+                                        onClick={handleCreateTicket}
+                                        disabled={isCreatingTicket || !ticketSubject.trim() || !ticketContent.trim()}
+                                        className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {isCreatingTicket ? (
+                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <MessageSquare size={16} />
+                                        )}
+                                        發送提問
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Ticket List */}
+                            <div>
+                                <h3 className="font-bold text-slate-900 mb-3 px-1">歷史提問紀錄</h3>
+                                {supportTickets.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400">
+                                        <p className="text-xs">尚無提問紀錄</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {supportTickets.map((ticket) => (
+                                            <div key={ticket.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="font-bold text-slate-900 text-sm">{ticket.subject}</div>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                                        ticket.status === 'open' ? 'bg-green-100 text-green-600' :
+                                                        ticket.status === 'replied' ? 'bg-blue-100 text-blue-600' :
+                                                        'bg-slate-100 text-slate-500'
+                                                    }`}>
+                                                        {ticket.status === 'open' ? '處理中' :
+                                                         ticket.status === 'replied' ? '已回覆' : '已結案'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-600 mb-3 leading-relaxed bg-slate-50 p-3 rounded-xl">
+                                                    {ticket.content}
+                                                </p>
+                                                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                                                    <span>案件編號: #{ticket.id.slice(-6)}</span>
+                                                    <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                                
+                                                {/* Reply Section */}
+                                                {ticket.reply && (
+                                                    <div className="mt-3 pt-3 border-t border-slate-100">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center text-[10px]">
+                                                                🤖
+                                                            </div>
+                                                            <span className="text-xs font-bold text-slate-900">客服回覆</span>
+                                                        </div>
+                                                        <div className="bg-rose-50 p-3 rounded-xl text-xs text-slate-700 leading-relaxed border border-rose-100">
+                                                            {ticket.reply}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

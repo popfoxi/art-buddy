@@ -3,62 +3,70 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 
-export async function getAdminStats() {
+// Helper to check admin permission
+async function checkAdmin() {
   const session = await auth();
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-
-  if (!session?.user?.email || session.user.email !== adminEmail) {
+  // @ts-ignore
+  const isAdmin = session?.user?.email === adminEmail || session?.user?.role === 'admin';
+  
+  if (!isAdmin) {
     throw new Error("Unauthorized");
   }
+  return session;
+}
 
-  // 1. Total Users
-  const totalUsers = await prisma.user.count();
+export async function getAdminStats() {
+  await checkAdmin();
 
-  // 2. Today's Analysis Count
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  // 1. User Stats
+  const totalUsers = await prisma.user.count();
+  const dailyRegistrations = await prisma.user.count({
+    where: { createdAt: { gte: today } }
+  });
+  
+  // Daily Logins (DAU)
+  const dailyLogins = await prisma.user.count({
+    where: { lastLogin: { gte: today } }
+  });
+
+  // Monthly Active Users (MAU) - Proxy for Retention/Activity
+  const monthlyActiveUsers = await prisma.user.count({
+    where: { lastLogin: { gte: thirtyDaysAgo } }
+  });
+  
+  const retentionRate = totalUsers > 0 ? (monthlyActiveUsers / totalUsers) * 100 : 0;
+  const activityLevel = totalUsers > 0 ? (dailyLogins / totalUsers) * 100 : 0;
+
+  // Paid Users Breakdown
+  const paidUsersPlus = await prisma.user.count({ where: { plan: "plus" } });
+  const paidUsersPro = await prisma.user.count({ where: { plan: "pro" } });
+  const totalPaidUsers = paidUsersPlus + paidUsersPro;
+
+  // Unresolved Tickets
+  const unresolvedTickets = await prisma.ticket.count({
+    where: { status: "open" }
+  });
+
+  // 2. Analysis Stats
   const todayAnalysis = await prisma.analysis.count({
-    where: {
-      createdAt: {
-        gte: today,
-      },
-    },
+    where: { createdAt: { gte: today } }
   });
+  const totalAnalysis = await prisma.analysis.count();
 
-  // 3. Conversion Rate (Users with plan != 'free')
-  const paidUsers = await prisma.user.count({
-    where: {
-      plan: {
-        not: "free",
-      },
-    },
+  // 3. Credits
+  const usersWithCredits = await prisma.user.findMany({
+    select: { credits: true },
   });
-  const conversionRate = totalUsers > 0 ? (paidUsers / totalUsers) * 100 : 0;
+  const totalCredits = usersWithCredits.reduce((sum, user) => sum + (user.credits || 0), 0);
 
-  // 4. Monthly Revenue (Mock for now, or calculated if we had payments)
-  // For now, let's assume Pro plan is $10/mo just for estimation if needed, 
-  // but better to return 0 or mock until real payments exist.
-  // User asked for "Real Data", so let's stick to what we have.
-  // We can calculate "Estimated Value" based on plans?
-  // Let's return a mock value for now as we don't have payment records in DB yet.
-  const monthlyRevenue = paidUsers * 10; // Mock $10 per paid user
-
-  // 5. Recent Users
-  const recentUsers = await prisma.user.findMany({
-    take: 5,
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      accounts: {
-        select: {
-          provider: true,
-        },
-      },
-    },
-  });
-
-  // 6. Analysis Trend (Last 7 Days)
+  // 4. Analysis Trend (Last 7 Days)
   const analysisTrend = [];
   for (let i = 6; i >= 0; i--) {
     const date = new Date();
@@ -69,20 +77,33 @@ export async function getAdminStats() {
 
     const count = await prisma.analysis.count({
       where: {
-        createdAt: {
-          gte: date,
-          lt: nextDate,
-        },
+        createdAt: { gte: date, lt: nextDate },
       },
     });
     analysisTrend.push(count);
   }
 
+  // 5. Recent Users (for dashboard list)
+  const recentUsers = await prisma.user.findMany({
+    take: 5,
+    orderBy: { createdAt: "desc" },
+    include: { accounts: { select: { provider: true } } },
+  });
+
   return {
     totalUsers,
+    dailyRegistrations,
+    dailyLogins,
+    monthlyActiveUsers,
+    retentionRate: retentionRate.toFixed(1),
+    activityLevel: activityLevel.toFixed(1),
+    paidUsersPlus,
+    paidUsersPro,
+    totalPaidUsers,
+    unresolvedTickets,
     todayAnalysis,
-    conversionRate: conversionRate.toFixed(1),
-    monthlyRevenue,
+    totalAnalysis,
+    totalCredits,
     analysisTrend,
     recentUsers: recentUsers.map((u: any) => ({
       ...u,
@@ -92,12 +113,7 @@ export async function getAdminStats() {
 }
 
 export async function getUsers(query?: string, role?: string, plan?: string) {
-  const session = await auth();
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-
-  if (!session?.user?.email || session.user.email !== adminEmail) {
-    throw new Error("Unauthorized");
-  }
+  await checkAdmin();
 
   const where: any = {};
 
@@ -108,18 +124,16 @@ export async function getUsers(query?: string, role?: string, plan?: string) {
     ];
   }
 
-  if (role && role !== "所有身份") {
-     // Not implementing role filter yet as UI didn't have it explicitly mapped
+  // Filter by Role
+  if (role && role !== "all") {
+    where.role = role;
   }
 
-  // Plan filter
-  if (plan && plan !== "所有等級") {
-      if (plan === "免費會員") where.plan = "free";
-      if (plan === "Pro 會員") where.plan = "pro"; // Assuming 'pro' is the key
+  // Filter by Plan
+  if (plan && plan !== "all") {
+    where.plan = plan;
   }
   
-  // Status filter (mocked in UI as 'Active', in DB we don't have status yet, so ignore)
-
   const users = await prisma.user.findMany({
     where,
     orderBy: {
@@ -133,56 +147,122 @@ export async function getUsers(query?: string, role?: string, plan?: string) {
       },
       _count: {
         select: {
-          analyses: true,
-        },
-      },
+          analyses: true
+        }
+      }
     },
-    take: 50, // Limit to 50 for now
   });
 
   return users.map((u: any) => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    image: u.image,
-    role: u.role,
-    plan: u.plan,
+    ...u,
     provider: u.accounts[0]?.provider || "email",
-    analysisCount: u._count.analyses,
-    createdAt: u.createdAt,
+    analysisCount: u._count.analyses
   }));
 }
 
+export async function deleteUser(userId: string) {
+    await checkAdmin();
+    await prisma.user.delete({ where: { id: userId } });
+    return { success: true };
+}
+
+export async function createUser(data: { name: string, email: string, role: string, plan: string, credits: number }) {
+    await checkAdmin();
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) throw new Error("Email already exists");
+    
+    await prisma.user.create({ data });
+    return { success: true };
+}
+
+export async function updateUser(userId: string, data: { name?: string, email?: string, role?: string, plan?: string, credits?: number }) {
+    await checkAdmin();
+    await prisma.user.update({
+        where: { id: userId },
+        data,
+    });
+    return { success: true };
+}
+
 export async function getSystemSettings() {
-  const session = await auth();
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-
-  if (!session?.user?.email || session.user.email !== adminEmail) {
-    throw new Error("Unauthorized");
-  }
-
+  await checkAdmin();
   const settings = await prisma.systemSetting.findMany();
-  // Convert array to object for easier consumption
-  const result: Record<string, string> = {};
-  for (const setting of settings) {
-    result[setting.key] = setting.value;
-  }
-  return result;
+  return settings.reduce((acc: any, curr: any) => {
+    acc[curr.key] = curr.value;
+    return acc;
+  }, {});
 }
 
 export async function updateSystemSetting(key: string, value: string) {
-  const session = await auth();
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-
-  if (!session?.user?.email || session.user.email !== adminEmail) {
-    throw new Error("Unauthorized");
-  }
-
+  await checkAdmin();
   await prisma.systemSetting.upsert({
     where: { key },
     update: { value },
     create: { key, value },
   });
-
   return { success: true };
+}
+
+// === User Management ===
+
+export async function updateUserCredits(userId: string, credits: number) {
+    await checkAdmin();
+    await prisma.user.update({
+        where: { id: userId },
+        data: { credits },
+    });
+    return { success: true };
+}
+
+// === Customer Support ===
+
+export async function getTickets() {
+    await checkAdmin();
+    const tickets = await prisma.ticket.findMany({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+            user: {
+                select: { id: true, name: true, email: true, image: true, credits: true }
+            }
+        }
+    });
+    return tickets;
+}
+
+export async function replyTicket(ticketId: string, reply: string) {
+    await checkAdmin();
+    await prisma.ticket.update({
+        where: { id: ticketId },
+        data: {
+            reply,
+            status: 'closed', // Auto close on reply? Or keep in progress? Let's close for now.
+        }
+    });
+    return { success: true };
+}
+
+// Public/User Action (No Admin Check)
+export async function createTicket(subject: string, content: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    await prisma.ticket.create({
+        data: {
+            userId: session.user.id,
+            subject,
+            content
+        }
+    });
+    return { success: true };
+}
+
+export async function getUserTickets() {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const tickets = await prisma.ticket.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: 'desc' }
+    });
+    return tickets;
 }

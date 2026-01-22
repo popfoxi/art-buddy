@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { 
@@ -18,7 +18,11 @@ import {
   DollarSign,
   TrendingUp,
   CheckCircle2,
-  Save
+  Save,
+  MessageSquare,
+  Plus,
+  Minus,
+  X
 } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
@@ -26,39 +30,83 @@ import { clsx } from "clsx";
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("overview"); // overview, users, revenue, settings
+  const [activeTab, setActiveTab] = useState("overview"); // overview, users, revenue, settings, support
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const [stats, setStats] = useState({
     totalUsers: 0,
+    dailyRegistrations: 0,
+    dailyLogins: 0,
+    monthlyActiveUsers: 0,
+    retentionRate: "0",
+    activityLevel: "0",
+    paidUsersPlus: 0,
+    paidUsersPro: 0,
+    totalPaidUsers: 0,
+    unresolvedTickets: 0,
     todayAnalysis: 0,
-    conversionRate: "0",
-    monthlyRevenue: 0,
+    totalAnalysis: 0,
+    totalCredits: 0,
     recentUsers: [] as any[],
     analysisTrend: [0, 0, 0, 0, 0, 0, 0]
   });
   const [users, setUsers] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Filter States
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Modal States
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null); // For Add/Edit User
+  const [isCreditModalOpen, setIsCreditModalOpen] = useState(false); // For Credit Management
+  const [selectedUserForCredit, setSelectedUserForCredit] = useState<any | null>(null);
+  
+  const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
+  const [ticketReply, setTicketReply] = useState("");
+  const [creditAmount, setCreditAmount] = useState(0);
 
   // Settings State
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
+  const loadUsers = async () => {
+      setIsLoading(true);
+      try {
+          const actions = await import("./actions");
+          const usersData = await actions.getUsers(searchQuery, roleFilter, planFilter);
+          setUsers(usersData);
+      } catch (error) {
+          console.error("Load users failed", error);
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const handleSearch = () => {
+    loadUsers();
+  };
+
   // Load Data
   useEffect(() => {
     if (status === "loading" || !session) return;
     
-    // Import actions dynamically or define outside if possible, but here we invoke them
     import("./actions").then(async (actions) => {
       try {
         const statsData = await actions.getAdminStats();
         setStats(statsData);
         
-        const usersData = await actions.getUsers();
+        // Initial load of users
+        const usersData = await actions.getUsers(searchQuery, roleFilter, planFilter);
         setUsers(usersData);
 
-        // Load settings if needed (or load lazy)
+        const ticketsData = await actions.getTickets();
+        setTickets(ticketsData);
+
         const settingsData = await actions.getSystemSettings();
         setSettings(settingsData);
       } catch (error) {
@@ -68,6 +116,92 @@ export default function AdminPage() {
       }
     });
   }, [session, status]);
+
+  // Reload users when filters change
+  useEffect(() => {
+    if (session) {
+        loadUsers();
+    }
+  }, [roleFilter, planFilter]);
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    try {
+        const actions = await import("./actions");
+        if (editingUser.id) {
+            // Update
+            await actions.updateUser(editingUser.id, {
+                name: editingUser.name,
+                email: editingUser.email,
+                role: editingUser.role,
+                plan: editingUser.plan,
+                credits: parseInt(editingUser.credits)
+            });
+            alert("會員資料更新成功");
+        } else {
+            // Create
+            await actions.createUser({
+                name: editingUser.name,
+                email: editingUser.email,
+                role: editingUser.role,
+                plan: editingUser.plan,
+                credits: parseInt(editingUser.credits)
+            });
+            alert("會員新增成功");
+        }
+        setIsUserModalOpen(false);
+        setEditingUser(null);
+        loadUsers();
+    } catch (error) {
+        console.error(error);
+        alert("儲存失敗: " + (error as any).message);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+      if (!confirm("確定要刪除此會員嗎？此動作無法復原。")) return;
+      try {
+          const actions = await import("./actions");
+          await actions.deleteUser(userId);
+          setUsers(users.filter(u => u.id !== userId));
+          alert("會員已刪除");
+      } catch (error) {
+          console.error(error);
+          alert("刪除失敗");
+      }
+  };
+
+  const handleUpdateCredits = async (userId: string, newCredits: number) => {
+    if (newCredits < 0) return;
+    try {
+        const actions = await import("./actions");
+        await actions.updateUserCredits(userId, newCredits);
+        setUsers(users.map(u => u.id === userId ? { ...u, credits: newCredits } : u));
+        setTickets(tickets.map(t => t.user?.id === userId ? { ...t, user: { ...t.user, credits: newCredits } } : t));
+        if (selectedUserForCredit) setSelectedUserForCredit({ ...selectedUserForCredit, credits: newCredits });
+        alert("點數更新成功");
+    } catch (e) {
+        console.error(e);
+        alert("更新失敗");
+    }
+  };
+
+  const handleReplyTicket = async (ticketId: string) => {
+    if (!ticketReply) return;
+    try {
+        const actions = await import("./actions");
+        await actions.replyTicket(ticketId, ticketReply);
+        setTickets(tickets.map(t => t.id === ticketId ? { ...t, status: 'closed', reply: ticketReply } : t));
+        setSelectedTicket(null);
+        setTicketReply("");
+        alert("回覆成功");
+    } catch (e) {
+        console.error(e);
+        alert("回覆失敗");
+    }
+  };
 
   const handleSaveSetting = async (key: string, value: string) => {
     setIsSaving(true);
@@ -107,12 +241,29 @@ export default function AdminPage() {
             <h1 className="text-2xl font-bold text-slate-900">管理員登入</h1>
             <p className="text-slate-500">請登入以存取管理後台</p>
           </div>
-          <Link 
-            href="/api/auth/signin?callbackUrl=/admin" 
-            className="block w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 active:scale-[0.98]"
-          >
-            登入帳號
-          </Link>
+          <div className="space-y-3 w-full">
+            <button 
+              onClick={() => signIn('google', { callbackUrl: '/admin' })}
+              className="w-full py-4 bg-white text-slate-700 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.84z" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+              </svg>
+              Google 登入
+            </button>
+            <button 
+              onClick={() => signIn('line', { callbackUrl: '/admin' })}
+              className="w-full py-4 bg-[#06C755] text-white rounded-xl font-bold hover:bg-[#05b34c] transition-all shadow-lg shadow-[#06C755]/20 active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <path d="M20.3 10.5c0-4.6-4.5-8.3-10-8.3S.3 5.9.3 10.5c0 4.1 3.6 7.5 8.9 8.1.3.1.8.3.9.8v.1c.1.4.2 1.2.1 1.4-.1.6-.8 2.2-1 3.1-.3 1.5 1.3 1.3 1.3 1.3 3.4-1.9 8.2-5.4 8.2-5.4 3.7-2 5.6-5.1 5.6-8.4zm-13.6 2.4H5.2v-3h1.5v3zm3.5-3h-1.5v1.2h1.5v-1.2zm0 1.8h-1.5v1.2h1.5v-1.2zm3.5-1.8H12v3h1.7v-3zm3.6 2h-2v-2h2v-1h-3.5v4h3.5v-1z" />
+              </svg>
+              LINE 登入
+            </button>
+          </div>
           <Link href="/" className="block text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">
             返回首頁
           </Link>
@@ -130,8 +281,13 @@ export default function AdminPage() {
               您目前的帳號 ({session?.user?.email || session?.user?.name}) 沒有管理員權限。
             </p>
             <div className="flex gap-4">
-              <Link href="/api/auth/signin" className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold">切換帳號</Link>
-              <Link href="/" className="px-6 py-3 bg-slate-200 text-slate-900 rounded-xl font-bold">回首頁</Link>
+              <button 
+                onClick={() => signOut({ callbackUrl: '/admin' })} 
+                className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold shadow-lg shadow-slate-900/20 active:scale-[0.98] transition-all"
+              >
+                切換帳號
+              </button>
+              <Link href="/" className="px-6 py-3 bg-slate-200 text-slate-900 rounded-xl font-bold hover:bg-slate-300 transition-colors">回首頁</Link>
             </div>
         </div>
     );
@@ -139,32 +295,152 @@ export default function AdminPage() {
 
   const renderContent = () => {
     switch(activeTab) {
+      case "overview":
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-slate-900">總覽儀表板</h2>
+
+            {/* Alert for Unresolved Tickets */}
+            {stats.unresolvedTickets > 0 && (
+              <div 
+                onClick={() => setActiveTab('support')}
+                className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center justify-between cursor-pointer hover:bg-rose-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center text-rose-600">
+                    <MessageSquare size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-rose-900">有 {stats.unresolvedTickets} 則未解決的客訴</h3>
+                    <p className="text-xs text-rose-600">請盡快前往處理用戶問題</p>
+                  </div>
+                </div>
+                <ArrowLeft className="rotate-180 text-rose-400" size={20} />
+              </div>
+            )}
+
+            {/* KPI Cards Row 1: Users & Activity */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">每日註冊人數</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.dailyRegistrations}</div>
+                  <div className="text-xs font-bold text-slate-400 mt-1">今日新增</div>
+               </div>
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">總註冊人數</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.totalUsers}</div>
+                  <div className="text-xs font-bold text-slate-400 mt-1">累積會員</div>
+               </div>
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">每日登入人數</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.dailyLogins}</div>
+                  <div className="text-xs font-bold text-slate-400 mt-1">今日活躍</div>
+               </div>
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">活躍度 (Activity)</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.activityLevel}%</div>
+                  <div className="text-xs font-bold text-slate-400 mt-1">DAU / Total</div>
+               </div>
+            </div>
+
+            {/* KPI Cards Row 2: Revenue & Retention */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">付費會員 (Plus/Pro)</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.totalPaidUsers}</div>
+                  <div className="flex gap-2 mt-1">
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">Plus: {stats.paidUsersPlus}</span>
+                    <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded font-bold">Pro: {stats.paidUsersPro}</span>
+                  </div>
+               </div>
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">留存率 (Retention)</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.retentionRate}%</div>
+                  <div className="text-xs font-bold text-slate-400 mt-1">MAU / Total</div>
+               </div>
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">不重複會員</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.totalUsers}</div>
+                  <div className="text-xs font-bold text-slate-400 mt-1">Unique Users</div>
+               </div>
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">總發行點數</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.totalCredits}</div>
+                  <div className="text-xs font-bold text-emerald-500 mt-1">可用於分析</div>
+               </div>
+            </div>
+
+            {/* Chart */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-6">近 7 日 AI 分析次數趨勢</h3>
+                <div className="h-64 flex items-end justify-between gap-2">
+                    {revenueData.map((val, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
+                            <div className="relative w-full bg-blue-50 rounded-t-lg overflow-hidden group-hover:bg-blue-100 transition-colors" style={{ height: `${(val / maxRevenue) * 100}%` }}>
+                                <div className="absolute bottom-0 w-full bg-blue-500 h-0 transition-all duration-500" style={{ height: '100%' }}></div>
+                                <div className="absolute top-0 w-full text-center text-[10px] text-blue-600 font-bold mt-1 opacity-0 group-hover:opacity-100">{val}</div>
+                            </div>
+                            <span className="text-xs font-bold text-slate-400">{idx === 6 ? 'Today' : `${6-idx}d ago`}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+          </div>
+        );
+
       case "users":
         return (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-900">會員管理</h2>
-              <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors">
-                <Download size={16} /> 匯出報表
-              </button>
+              <div className="flex gap-2">
+                <button 
+                    onClick={() => {
+                        setEditingUser({ name: "", email: "", role: "user", plan: "free", credits: 3 });
+                        setIsUserModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-500 transition-colors"
+                >
+                    <Plus size={16} /> 新增會員
+                </button>
+                <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors">
+                    <Download size={16} /> 匯出報表
+                </button>
+              </div>
             </div>
 
             {/* Filters */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-wrap gap-4 items-center justify-between">
                <div className="flex items-center gap-2 flex-1 min-w-[240px]">
                   <Search size={20} className="text-slate-400" />
-                  <input type="text" placeholder="搜尋會員姓名、Email..." className="w-full bg-transparent outline-none text-sm font-bold text-slate-700 placeholder:font-normal" />
+                  <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    placeholder="搜尋會員姓名、Email... (按 Enter 搜尋)" 
+                    className="w-full bg-transparent outline-none text-sm font-bold text-slate-700 placeholder:font-normal" 
+                  />
                </div>
                <div className="flex items-center gap-3">
-                  <select className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg px-3 py-2 outline-none">
-                    <option>所有等級</option>
-                    <option>免費會員</option>
-                    <option>Pro 會員</option>
+                  <select 
+                    value={planFilter}
+                    onChange={(e) => setPlanFilter(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg px-3 py-2 outline-none"
+                  >
+                    <option value="all">所有等級 (Plan)</option>
+                    <option value="free">Free</option>
+                    <option value="plus">Plus</option>
+                    <option value="pro">Pro</option>
                   </select>
-                  <select className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg px-3 py-2 outline-none">
-                    <option>所有狀態</option>
-                    <option>正常</option>
-                    <option>停權</option>
+                  <select 
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg px-3 py-2 outline-none"
+                  >
+                    <option value="all">所有身分 (Role)</option>
+                    <option value="user">一般會員</option>
+                    <option value="admin">管理員</option>
                   </select>
                </div>
             </div>
@@ -175,42 +451,76 @@ export default function AdminPage() {
                     <thead>
                         <tr className="bg-slate-50 border-b border-slate-100">
                             <th className="p-4 text-xs font-bold text-slate-500">會員資訊</th>
-                            <th className="p-4 text-xs font-bold text-slate-500">登入方式</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">身分</th>
                             <th className="p-4 text-xs font-bold text-slate-500">訂閱方案</th>
-                            <th className="p-4 text-xs font-bold text-slate-500">消費總額</th>
-                            <th className="p-4 text-xs font-bold text-slate-500">註冊時間</th>
-                            <th className="p-4 text-xs font-bold text-slate-500">狀態</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">可用次數</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">上次登入</th>
                             <th className="p-4 text-xs font-bold text-slate-500">操作</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                        {users.map((u) => (
+                            <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-slate-200" />
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
+                                            {u.image && <img src={u.image} className="w-full h-full object-cover" />}
+                                        </div>
                                         <div>
-                                            <div className="text-sm font-bold text-slate-900">User {i}</div>
-                                            <div className="text-xs text-slate-400">user{i}@example.com</div>
+                                            <div className="text-sm font-bold text-slate-900">{u.name || "Unknown"}</div>
+                                            <div className="text-xs text-slate-400">{u.email}</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="p-4">
-                                    <span className="flex items-center gap-1 text-xs font-bold text-slate-600">
-                                        {i % 2 === 0 ? "Google" : "LINE"}
+                                    <span className={`text-xs font-bold ${u.role === 'admin' ? 'text-purple-600 bg-purple-50 px-2 py-1 rounded-full' : 'text-slate-500'}`}>
+                                        {u.role === 'admin' ? 'Admin' : 'User'}
                                     </span>
                                 </td>
                                 <td className="p-4">
-                                    {i % 3 === 0 ? (
-                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600">Pro+</span>
+                                    {u.plan === 'pro' ? (
+                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600">Pro</span>
+                                    ) : u.plan === 'plus' ? (
+                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-600">Plus</span>
                                     ) : (
                                         <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Free</span>
                                     )}
                                 </td>
-                                <td className="p-4 text-sm font-bold text-slate-900">${i * 150}</td>
-                                <td className="p-4 text-xs text-slate-400">2024/01/{10+i}</td>
-                                <td className="p-4"><span className="text-xs font-bold text-emerald-600">Active</span></td>
-                                <td className="p-4"><button className="text-xs font-bold text-blue-600 hover:underline">管理</button></td>
+                                <td className="p-4 text-sm font-bold text-slate-900">{u.credits}</td>
+                                <td className="p-4 text-xs text-slate-400">
+                                    {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '-'}
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => {
+                                                setEditingUser(u);
+                                                setIsUserModalOpen(true);
+                                            }}
+                                            className="text-xs font-bold text-blue-600 hover:underline"
+                                        >
+                                            編輯
+                                        </button>
+                                        <span className="text-slate-300">|</span>
+                                        <button 
+                                            onClick={() => {
+                                                setSelectedUserForCredit(u);
+                                                setCreditAmount(u.credits);
+                                                setIsCreditModalOpen(true);
+                                            }}
+                                            className="text-xs font-bold text-emerald-600 hover:underline"
+                                        >
+                                            點數
+                                        </button>
+                                        <span className="text-slate-300">|</span>
+                                        <button 
+                                            onClick={() => handleDeleteUser(u.id)}
+                                            className="text-xs font-bold text-red-600 hover:underline"
+                                        >
+                                            刪除
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -294,7 +604,7 @@ export default function AdminPage() {
                                             value={settings["ga4_id"] || ""}
                                             onChange={(e) => setSettings(prev => ({ ...prev, "ga4_id": e.target.value }))}
                                             placeholder="G-XXXXXXXXXX"
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                                            className="w-full max-w-md bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
                                         />
                                     </div>
                                 </div>
@@ -345,23 +655,80 @@ export default function AdminPage() {
                     </div>
         );
 
+      case "support":
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-slate-900">客服系統</h2>
+            
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                            <th className="p-4 text-xs font-bold text-slate-500">用戶</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">主旨</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">狀態</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">時間</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {tickets.length === 0 ? (
+                            <tr>
+                                <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">目前沒有客訴案件</td>
+                            </tr>
+                        ) : (
+                            tickets.map((ticket) => (
+                                <tr key={ticket.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
+                                                 {ticket.user.image && <img src={ticket.user.image} className="w-full h-full object-cover" />}
+                                            </div>
+                                            <div className="text-sm font-bold text-slate-900">{ticket.user.name}</div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-sm text-slate-700 font-bold">{ticket.subject || "無主旨"}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                                            ticket.status === 'open' ? 'bg-rose-100 text-rose-600' : 
+                                            ticket.status === 'closed' ? 'bg-emerald-100 text-emerald-600' : 
+                                            'bg-blue-100 text-blue-600'
+                                        }`}>
+                                            {ticket.status === 'open' ? '待處理' : ticket.status === 'closed' ? '已結案' : '處理中'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-xs text-slate-400">{new Date(ticket.createdAt).toLocaleString()}</td>
+                                    <td className="p-4 flex gap-3">
+                                        <button 
+                                            onClick={() => setSelectedTicket(ticket)}
+                                            className="text-xs font-bold text-blue-600 hover:underline"
+                                        >
+                                            回覆
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                if (ticket.user) {
+                                                    setSelectedUser(ticket.user);
+                                                    setCreditAmount(ticket.user.credits || 0);
+                                                }
+                                            }}
+                                            className="text-xs font-bold text-emerald-600 hover:underline"
+                                        >
+                                            補償點數
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+          </div>
+        );
+
       default: // overview
         return (
           <div className="space-y-8">
-            {/* Database Connected Banner */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 flex items-start gap-4">
-                <div className="bg-emerald-100 p-2 rounded-full text-emerald-600 shrink-0">
-                    <Database size={24} />
-                </div>
-                <div>
-                    <h3 className="text-emerald-900 font-bold text-lg mb-1">資料庫已連線 (Live)</h3>
-                    <p className="text-emerald-700/80 text-sm leading-relaxed">
-                        目前顯示為 <strong>Vercel Postgres (Neon)</strong> 真實數據。所有會員註冊與登入皆會即時更新。
-                        <br/><span className="text-xs opacity-70">系統版本: v1.2.0 (已啟用真實數據串接)</span>
-                    </p>
-                </div>
-            </div>
-
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
@@ -369,28 +736,28 @@ export default function AdminPage() {
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={18} /></div>
                         <span className="text-xs font-bold text-slate-500">總會員數</span>
                     </div>
-                    <div className="text-2xl font-black text-slate-900">1,248</div>
+                    <div className="text-2xl font-black text-slate-900">{stats.totalUsers}</div>
                 </div>
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><DollarSign size={18} /></div>
-                        <span className="text-xs font-bold text-slate-500">本月營收</span>
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Activity size={18} /></div>
+                        <span className="text-xs font-bold text-slate-500">總分析次數</span>
                     </div>
-                    <div className="text-2xl font-black text-slate-900">$12.4k</div>
+                    <div className="text-2xl font-black text-slate-900">{stats.totalAnalysis}</div>
                 </div>
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Activity size={18} /></div>
                         <span className="text-xs font-bold text-slate-500">今日分析</span>
                     </div>
-                    <div className="text-2xl font-black text-slate-900">342</div>
+                    <div className="text-2xl font-black text-slate-900">{stats.todayAnalysis}</div>
                 </div>
                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><Shield size={18} /></div>
-                        <span className="text-xs font-bold text-slate-500">付費轉換率</span>
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><CreditCard size={18} /></div>
+                        <span className="text-xs font-bold text-slate-500">總發行點數 (可分析)</span>
                     </div>
-                    <div className="text-2xl font-black text-slate-900">4.2%</div>
+                    <div className="text-2xl font-black text-slate-900">{stats.totalCredits.toLocaleString()}</div>
                 </div>
             </div>
 
@@ -410,14 +777,16 @@ export default function AdminPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                             {[1, 2, 3].map(i => (
-                                <tr key={i}>
+                             {stats.recentUsers.map((u: any) => (
+                                <tr key={u.id}>
                                     <td className="p-4 flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-full bg-slate-200" />
-                                        <span className="text-sm font-bold text-slate-700">New User {i}</span>
+                                        <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden">
+                                            {u.image && <img src={u.image} className="w-full h-full object-cover" />}
+                                        </div>
+                                        <span className="text-sm font-bold text-slate-700">{u.name || "Unknown"}</span>
                                     </td>
-                                    <td className="p-4 text-xs font-bold text-slate-500">Google</td>
-                                    <td className="p-4 text-xs text-slate-400">10 mins ago</td>
+                                    <td className="p-4 text-xs font-bold text-slate-500">{u.provider}</td>
+                                    <td className="p-4 text-xs text-slate-400">{new Date(u.createdAt).toLocaleDateString()}</td>
                                 </tr>
                              ))}
                         </tbody>
@@ -461,6 +830,13 @@ export default function AdminPage() {
                 <CreditCard size={18} />
                 營收報表
             </button>
+            <button 
+                onClick={() => setActiveTab("support")}
+                className={clsx("w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors", activeTab === "support" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50")}
+            >
+                <MessageSquare size={18} />
+                客服系統
+            </button>
             <div className="pt-4 mt-4 border-t border-slate-100">
                 <button 
                     onClick={() => setActiveTab("settings")}
@@ -485,11 +861,18 @@ export default function AdminPage() {
       {/* Main Content */}
       <main className="flex-1 md:ml-64 min-h-screen">
         <header className="h-16 bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-10 px-6 flex items-center justify-between">
-            <h1 className="text-lg font-bold text-slate-900 capitalize">
-                {activeTab === "overview" ? "總覽儀表板" : 
-                 activeTab === "users" ? "會員管理" : 
-                 activeTab === "revenue" ? "營收報表" : "系統設定"}
-            </h1>
+            <div className="flex items-center gap-4">
+                <h1 className="text-lg font-bold text-slate-900 capitalize">
+                    {activeTab === "overview" ? "總覽儀表板" : 
+                     activeTab === "users" ? "會員管理" : 
+                     activeTab === "revenue" ? "營收報表" : 
+                     activeTab === "support" ? "客服系統" : "系統設定"}
+                </h1>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold border border-emerald-100">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    DB Live
+                </div>
+            </div>
             <div className="flex items-center gap-4">
                 <Link href="/" className="text-xs font-bold text-slate-500 hover:text-slate-900 flex items-center gap-1">
                     回前台 <ArrowLeft size={14} />
@@ -500,6 +883,132 @@ export default function AdminPage() {
             {renderContent()}
         </div>
       </main>
+
+      {/* User Management Modal */}
+      {isUserModalOpen && editingUser && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4">
+                <div className="flex justify-between items-start">
+                    <h3 className="text-lg font-bold text-slate-900">{editingUser.id ? '編輯會員' : '新增會員'}</h3>
+                    <button onClick={() => setIsUserModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                </div>
+                
+                <form onSubmit={handleSaveUser} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">姓名</label>
+                        <input 
+                            type="text" 
+                            required
+                            value={editingUser.name}
+                            onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Email</label>
+                        <input 
+                            type="email" 
+                            required
+                            disabled={!!editingUser.id}
+                            value={editingUser.email}
+                            onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-50"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">身分 (Role)</label>
+                            <select 
+                                value={editingUser.role}
+                                onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10"
+                            >
+                                <option value="user">一般會員</option>
+                                <option value="admin">管理員</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">等級 (Plan)</label>
+                            <select 
+                                value={editingUser.plan}
+                                onChange={(e) => setEditingUser({...editingUser, plan: e.target.value})}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10"
+                            >
+                                <option value="free">Free</option>
+                                <option value="plus">Plus</option>
+                                <option value="pro">Pro</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">點數 (Credits)</label>
+                        <input 
+                            type="number" 
+                            required
+                            min="0"
+                            value={editingUser.credits}
+                            onChange={(e) => setEditingUser({...editingUser, credits: e.target.value})}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10"
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4">
+                        <button type="button" onClick={() => setIsUserModalOpen(false)} className="px-6 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">取消</button>
+                        <button type="submit" className="px-6 py-2 bg-slate-900 text-white font-bold rounded-xl">儲存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* Edit Credits Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
+                <h3 className="text-lg font-bold text-slate-900">管理用戶點數</h3>
+                <p className="text-sm text-slate-500">調整 {selectedUser.name} 的可用分析次數。</p>
+                <div className="flex items-center gap-4 justify-center py-4">
+                    <button onClick={() => setCreditAmount(Math.max(0, creditAmount - 1))} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><Minus size={20} /></button>
+                    <span className="text-3xl font-black text-slate-900">{creditAmount}</span>
+                    <button onClick={() => setCreditAmount(creditAmount + 1)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><Plus size={20} /></button>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={() => setSelectedUser(null)} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl">取消</button>
+                    <button onClick={() => handleUpdateCredits(selectedUser.id, creditAmount)} className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl">確認更新</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Ticket Reply Modal */}
+      {selectedTicket && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4">
+                <div className="flex justify-between items-start">
+                    <h3 className="text-lg font-bold text-slate-900">回覆客訴案件</h3>
+                    <button onClick={() => setSelectedTicket(null)}><X size={20} className="text-slate-400" /></button>
+                </div>
+                
+                <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <span className="text-rose-500">Q:</span> {selectedTicket.content}
+                    </div>
+                </div>
+
+                <textarea 
+                    value={ticketReply}
+                    onChange={(e) => setTicketReply(e.target.value)}
+                    placeholder="輸入回覆內容..."
+                    className="w-full h-32 bg-white border border-slate-200 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-slate-900/10"
+                ></textarea>
+
+                <div className="flex justify-end gap-3">
+                    <button onClick={() => setSelectedTicket(null)} className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl">取消</button>
+                    <button onClick={() => handleReplyTicket(selectedTicket.id)} className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl">發送回覆</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }
