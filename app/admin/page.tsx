@@ -136,22 +136,150 @@ export default function AdminPage() {
                     <div className="p-2 bg-purple-50 text-purple-500 rounded-lg">
                         <Users size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">預估</span>
+                    <span className="text-xs font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded">模擬數據</span>
                 </div>
-                <div className="text-3xl font-black text-slate-900">--</div>
-                <div className="text-sm text-slate-500 mt-1">需連接資料庫以顯示會員數</div>
+                <div className="text-3xl font-black text-slate-900">1,248</div>
+                <div className="text-sm text-slate-500 mt-1">總註冊會員數 (範例)</div>
             </div>
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                    <div className="p-2 bg-rose-50 text-rose-500 rounded-lg">
+                    <div className="p-2 bg-emerald-50 text-emerald-500 rounded-lg">
                         <Shield size={20} />
                     </div>
                 </div>
-                <div className="text-3xl font-black text-slate-900">Admin</div>
-                <div className="text-sm text-slate-500 mt-1">當前權限等級</div>
+                <div className="text-3xl font-black text-slate-900">Plus</div>
+                <div className="text-sm text-slate-500 mt-1">最多訂閱方案 (範例)</div>
             </div>
         </div>
+
+        {/* Member List Mockup */}
+        <section>
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-slate-900">會員列表 (模擬預覽)</h2>
+                <div className="flex gap-2">
+                    <button className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">匯出 CSV</button>
+                    <button className="px-3 py-1.5 bg-rose-500 text-white rounded-lg text-xs font-bold hover:bg-rose-600">新增會員</button>
+                </div>
+            </div>
+            
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100">
+                                <th className="p-4 text-xs font-bold text-slate-500">用戶資訊</th>
+                                <th className="p-4 text-xs font-bold text-slate-500">登入方式</th>
+                                <th className="p-4 text-xs font-bold text-slate-500">會員等級</th>
+                                <th className="p-4 text-xs font-bold text-slate-500">分析次數</th>
+                                <th className="p-4 text-xs font-bold text-slate-500">註冊日期</th>
+                                <th className="p-4 text-xs font-bold text-slate-500">狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {/* Mock Data Row 1: Admin */}
+                            <tr className="hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
+                                            <img src={session?.user?.image || "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin"} alt="User" />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-900">{session?.user?.name || "Irisa Ho"}</div>
+                                            <div className="text-xs text-slate-400">{session?.user?.email || "admin@example.com"}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                                        <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">G</div>
+                                        Google
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-200">
+                                        Pro+ 會員
+                                    </span>
+                                </td>
+                                <td className="p-4 text-sm text-slate-600 font-bold">142 次</td>
+                                <td className="p-4 text-xs text-slate-400">2024/01/15</td>
+                                <td className="p-4">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-2"></span>
+                                    <span className="text-xs font-bold text-emerald-600">正常</span>
+                                </td>
+                            </tr>
+
+                            {/* Mock Data Row 2: Free User */}
+                            <tr className="hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500 text-xs font-bold">
+                                            AL
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-900">Alex Chen</div>
+                                            <div className="text-xs text-slate-400">alex.chen@test.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                                        <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-600">L</div>
+                                        LINE
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                        免費會員
+                                    </span>
+                                </td>
+                                <td className="p-4 text-sm text-slate-600 font-bold">5 次</td>
+                                <td className="p-4 text-xs text-slate-400">2024/02/01</td>
+                                <td className="p-4">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-2"></span>
+                                    <span className="text-xs font-bold text-emerald-600">正常</span>
+                                </td>
+                            </tr>
+
+                            {/* Mock Data Row 3: Plus User */}
+                            <tr className="hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-amber-100 overflow-hidden">
+                                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="User" />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-900">Sarah Wu</div>
+                                            <div className="text-xs text-slate-400">sarah.wu@gmail.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                                        <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">G</div>
+                                        Google
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-600 border border-purple-200">
+                                        Plus 會員
+                                    </span>
+                                </td>
+                                <td className="p-4 text-sm text-slate-600 font-bold">28 次</td>
+                                <td className="p-4 text-xs text-slate-400">2024/01/20</td>
+                                <td className="p-4">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 inline-block mr-2"></span>
+                                    <span className="text-xs font-bold text-amber-600">待續費</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                    <p className="text-xs text-slate-400">僅顯示前 3 筆模擬資料，請連接資料庫以查看完整列表</p>
+                </div>
+            </div>
+        </section>
 
         {/* Action Area */}
         <section>
