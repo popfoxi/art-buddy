@@ -2105,6 +2105,7 @@ export default function Home() {
       )}
 
       {/* === PRO MODAL === */}
+      {/* Updated to use Plus/Pro+ naming convention */}
       {showProModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-slideUp relative">
