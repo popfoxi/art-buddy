@@ -587,71 +587,71 @@ export default function AdminPage() {
                     )}
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 className="text-lg font-bold text-slate-900 mb-6">第三方服務串接</h3>
+                    
+                    <div className="space-y-6">
+                        {/* GA4 */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100 last:pb-0 last:border-0">
+                            <div className="flex-1">
+                                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                                     Google Analytics 4
-                                </h3>
-                                <p className="text-sm text-slate-500">
-                                    輸入您的 GA4 評估 ID (Measurement ID)，例如：G-XXXXXXXXXX。
-                                    設定後，系統將自動在全站注入追蹤程式碼。
+                                    <span className="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full">流量追蹤</span>
+                                </h4>
+                                <p className="text-xs text-slate-500 mt-1 max-w-md">
+                                    輸入您的 GA4 評估 ID (Measurement ID) 以啟用全站流量分析。
                                 </p>
-                                <div className="flex gap-4">
-                                    <div className="flex-1">
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">評估 ID (Measurement ID)</label>
-                                        <input 
-                                            type="text" 
-                                            value={settings["ga4_id"] || ""}
-                                            onChange={(e) => setSettings(prev => ({ ...prev, "ga4_id": e.target.value }))}
-                                            placeholder="G-XXXXXXXXXX"
-                                            className="w-full max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex justify-end pt-2">
-                                    <button 
-                                        onClick={() => handleSaveSetting("ga4_id", settings["ga4_id"] || "")}
-                                        disabled={isSaving}
-                                        className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
-                                    >
-                                        {isSaving ? "儲存中..." : <><Save size={18} /> 儲存設定</>}
-                                    </button>
-                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 w-full md:w-auto">
+                                <input 
+                                    type="text" 
+                                    value={settings["ga4_id"] || ""}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, "ga4_id": e.target.value }))}
+                                    placeholder="G-XXXXXXXXXX"
+                                    className="flex-1 md:w-64 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                                />
+                                <button 
+                                    onClick={() => handleSaveSetting("ga4_id", settings["ga4_id"] || "")}
+                                    disabled={isSaving}
+                                    className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 shadow-sm"
+                                    title="儲存設定"
+                                >
+                                    {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Save size={18} />}
+                                </button>
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="space-y-2">
-                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                    Google AdSense 廣告
-                                </h3>
-                                <p className="text-sm text-slate-500">
-                                    輸入您的 Google AdSense 發佈商 ID (Publisher ID)，例如：pub-XXXXXXXXXXXXXXXX。
-                                    設定後，系統將自動啟用全站自動廣告 (Auto Ads)。
+                        {/* AdSense */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex-1">
+                                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                    Google AdSense
+                                    <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">廣告收益</span>
+                                </h4>
+                                <p className="text-xs text-slate-500 mt-1 max-w-md">
+                                    輸入發佈商 ID (Publisher ID) 以啟用全站自動廣告 (Auto Ads)。
                                 </p>
-                                <div className="flex gap-4">
-                                    <div className="flex-1">
-                                        <label className="block text-xs font-bold text-slate-700 mb-1">發佈商 ID (Publisher ID)</label>
-                                        <input 
-                                            type="text" 
-                                            value={settings["adsense_id"] || ""}
-                                            onChange={(e) => setSettings(prev => ({ ...prev, "adsense_id": e.target.value }))}
-                                            placeholder="pub-XXXXXXXXXXXXXXXX"
-                                            className="w-full max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex justify-end pt-2">
-                                    <button 
-                                        onClick={() => handleSaveSetting("adsense_id", settings["adsense_id"] || "")}
-                                        disabled={isSaving}
-                                        className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors disabled:opacity-50"
-                                    >
-                                        {isSaving ? "儲存中..." : <><Save size={18} /> 儲存設定</>}
-                                    </button>
-                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 w-full md:w-auto">
+                                <input 
+                                    type="text" 
+                                    value={settings["adsense_id"] || ""}
+                                    onChange={(e) => setSettings(prev => ({ ...prev, "adsense_id": e.target.value }))}
+                                    placeholder="pub-XXXXXXXXXXXXXXXX"
+                                    className="flex-1 md:w-64 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                                />
+                                <button 
+                                    onClick={() => handleSaveSetting("adsense_id", settings["adsense_id"] || "")}
+                                    disabled={isSaving}
+                                    className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 shadow-sm"
+                                    title="儲存設定"
+                                >
+                                    {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Save size={18} />}
+                                </button>
                             </div>
                         </div>
+                    </div>
+                </div>
                     </div>
         );
 
