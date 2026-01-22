@@ -108,6 +108,9 @@ export default function Home() {
     localStorage.setItem(key, JSON.stringify(data));
   }, [historyItems, userChallenges, favoriteArtworkIds, session?.user?.email, isLoaded]);
 
+  const [favoriteFilterType, setFavoriteFilterType] = useState<"all" | "medium" | "master">("all");
+  const [favoriteFilterValue, setFavoriteFilterValue] = useState<string | null>(null);
+
   const toggleFavorite = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     setFavoriteArtworkIds(prev => {
@@ -682,16 +685,41 @@ export default function Home() {
                 </div>
                 
                 <label className="block w-full relative z-10">
+                  <div className="grid grid-cols-2 gap-3">
+                     <div 
+                       onClick={() => document.getElementById('camera-upload')?.click()}
+                       className="py-3.5 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-lg shadow-rose-200"
+                     >
+                       <Camera size={20} />
+                       <span className="text-xs">拍照上傳</span>
+                     </div>
+                     <div 
+                       onClick={() => document.getElementById('gallery-upload')?.click()}
+                       className="py-3.5 bg-white text-rose-600 border border-rose-200 rounded-xl font-bold text-center cursor-pointer hover:bg-rose-50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
+                     >
+                       <div className="flex items-center gap-1">
+                          <Upload size={20} />
+                       </div>
+                       <span className="text-xs">相簿選取</span>
+                     </div>
+                  </div>
+                  
+                  {/* Hidden Inputs */}
                   <input 
+                    id="camera-upload"
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment"
+                    className="hidden" 
+                    onChange={handleImageUpload}
+                  />
+                  <input 
+                    id="gallery-upload"
                     type="file" 
                     accept="image/*" 
                     className="hidden" 
                     onChange={handleImageUpload}
                   />
-                  <div className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-200">
-                    <Upload size={18} />
-                    上傳作品求點評
-                  </div>
                 </label>
             </div>
 
@@ -1285,16 +1313,40 @@ export default function Home() {
 
                      {/* Upload Button inside Banner */}
                      <label className="block w-full relative z-10 pt-2">
+                        <div className="grid grid-cols-2 gap-3">
+                           <div 
+                             onClick={() => document.getElementById('challenge-camera-upload')?.click()}
+                             className="py-3 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-lg shadow-rose-200"
+                           >
+                             <Camera size={18} />
+                             <span className="text-xs">拍照上傳</span>
+                           </div>
+                           <div 
+                             onClick={() => document.getElementById('challenge-gallery-upload')?.click()}
+                             className="py-3 bg-white text-rose-600 border border-rose-200 rounded-xl font-bold text-center cursor-pointer hover:bg-rose-50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-1 shadow-sm"
+                           >
+                             <div className="flex items-center gap-1">
+                                <Upload size={18} />
+                             </div>
+                             <span className="text-xs">相簿選取</span>
+                           </div>
+                        </div>
+
                         <input 
+                            id="challenge-camera-upload"
+                            type="file" 
+                            accept="image/*" 
+                            capture="environment"
+                            className="hidden" 
+                            onChange={(e) => handleImageUpload(e, true)}
+                        />
+                        <input 
+                            id="challenge-gallery-upload"
                             type="file" 
                             accept="image/*" 
                             className="hidden" 
                             onChange={(e) => handleImageUpload(e, true)}
                         />
-                        <div className="w-full py-3 bg-rose-600 text-white rounded-xl font-bold text-center cursor-pointer hover:bg-rose-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-200">
-                            <Upload size={18} />
-                            上傳挑戰作品
-                        </div>
                     </label>
                  </div>
              )}
@@ -1532,28 +1584,106 @@ export default function Home() {
                     </div>
 
                     {favoriteArtworkIds.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-3">
-                            {exploreGallery
-                                .filter(artwork => favoriteArtworkIds.includes(artwork.id))
-                                .map(artwork => (
-                                    <div 
-                                        key={artwork.id} 
-                                        onClick={() => setSelectedArtwork(artwork)}
-                                        className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100"
+                        <>
+                             {/* Favorite Filters */}
+                             <div className="mb-4 space-y-3">
+                                <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                                    <button 
+                                        onClick={() => {
+                                            setFavoriteFilterType("all");
+                                            setFavoriteFilterValue(null);
+                                        }}
+                                        className={`
+                                            px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border
+                                            ${favoriteFilterType === "all" 
+                                                ? "bg-slate-900 text-white border-slate-900" 
+                                                : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                        `}
                                     >
-                                        <img 
-                                            src={artwork.imageUrl} 
-                                            alt={artwork.title} 
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-                                            <p className="text-white text-xs font-bold line-clamp-1">{artwork.title}</p>
-                                            <p className="text-white/80 text-[10px]">{artwork.master}</p>
+                                        全部顯示
+                                    </button>
+                                    <div className="w-px h-6 bg-slate-200 mx-1 self-center" />
+                                    {Array.from(new Set(
+                                        exploreGallery
+                                            .filter(a => favoriteArtworkIds.includes(a.id))
+                                            .map(a => a.medium)
+                                    )).map(mediumId => {
+                                        const mediumName = artMediums.find(m => m.id === mediumId)?.name || mediumId;
+                                        return (
+                                            <button 
+                                                key={mediumId}
+                                                onClick={() => {
+                                                    setFavoriteFilterType("medium");
+                                                    setFavoriteFilterValue(mediumId);
+                                                }}
+                                                className={`
+                                                    px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1
+                                                    ${favoriteFilterType === "medium" && favoriteFilterValue === mediumId
+                                                        ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
+                                                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                                `}
+                                            >
+                                                <span className="grayscale-[0.5]">{artMediums.find(m => m.id === mediumId)?.icon}</span>
+                                                {mediumName}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                                     {Array.from(new Set(
+                                        exploreGallery
+                                            .filter(a => favoriteArtworkIds.includes(a.id))
+                                            .map(a => a.master)
+                                    )).map(master => (
+                                        <button 
+                                            key={master}
+                                            onClick={() => {
+                                                setFavoriteFilterType("master");
+                                                setFavoriteFilterValue(master);
+                                            }}
+                                            className={`
+                                                px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5
+                                                ${favoriteFilterType === "master" && favoriteFilterValue === master
+                                                    ? "bg-rose-50 text-rose-600 border-rose-200 ring-1 ring-rose-200" 
+                                                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}
+                                            `}
+                                        >
+                                            <User size={10} className={favoriteFilterType === "master" && favoriteFilterValue === master ? "text-rose-500" : "text-slate-400"} />
+                                            {master}
+                                        </button>
+                                    ))}
+                                </div>
+                             </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                {exploreGallery
+                                    .filter(artwork => favoriteArtworkIds.includes(artwork.id))
+                                    .filter(artwork => {
+                                        if (favoriteFilterType === "all") return true;
+                                        if (favoriteFilterType === "medium") return artwork.medium === favoriteFilterValue;
+                                        if (favoriteFilterType === "master") return artwork.master === favoriteFilterValue;
+                                        return true;
+                                    })
+                                    .map(artwork => (
+                                        <div 
+                                            key={artwork.id} 
+                                            onClick={() => setSelectedArtwork(artwork)}
+                                            className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100"
+                                        >
+                                            <img 
+                                                src={artwork.imageUrl} 
+                                                alt={artwork.title} 
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                                                <p className="text-white text-xs font-bold line-clamp-1">{artwork.title}</p>
+                                                <p className="text-white/80 text-[10px]">{artwork.master}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
-                            }
-                        </div>
+                                    ))
+                                }
+                            </div>
+                        </>
                     ) : (
                         <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 border-dashed">
                              <div className="flex justify-center mb-2">
