@@ -43,6 +43,7 @@ export default function Home() {
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [selectedMedium, setSelectedMedium] = useState<string | null>(null);
   const [selectedMaster, setSelectedMaster] = useState<string | null>(null);
+  const [exploreFilterType, setExploreFilterType] = useState<"medium" | "master">("medium");
   const [activeTab, setActiveTab] = useState<"home" | "explore" | "history" | "challenge" | "profile">("home");
   const [isAddingMaster, setIsAddingMaster] = useState(false);
   const [newMasterName, setNewMasterName] = useState("");
@@ -725,7 +726,7 @@ export default function Home() {
 
                 <div className="p-5 pb-32">
                     <div className="aspect-video bg-slate-100 rounded-xl mb-6 overflow-hidden relative shadow-inner group">
-                      <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
+                      <img src={selectedImage || ""} alt="Preview" className="w-full h-full object-cover" />
                       
                       {/* Feedback Overlays */}
                       {result && !isAnalyzing && result.feedback.map((item: any, idx: number) => (
