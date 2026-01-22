@@ -66,21 +66,28 @@ export async function getAdminStats() {
   });
   const totalCredits = usersWithCredits.reduce((sum, user) => sum + (user.credits || 0), 0);
 
-  // 4. Analysis Trend (Last 7 Days)
+  // 4. Analysis Trend (Last 30 Days)
   const analysisTrend = [];
-  for (let i = 6; i >= 0; i--) {
+  for (let i = 29; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     date.setHours(0, 0, 0, 0);
     const nextDate = new Date(date);
     nextDate.setDate(date.getDate() + 1);
 
-    const count = await prisma.analysis.count({
-      where: {
-        createdAt: { gte: date, lt: nextDate },
-      },
+    const generalCount = await prisma.analysis.count({
+      where: { createdAt: { gte: date, lt: nextDate }, type: { not: "master_style" } },
     });
-    analysisTrend.push(count);
+    const masterCount = await prisma.analysis.count({
+      where: { createdAt: { gte: date, lt: nextDate }, type: "master_style" },
+    });
+
+    analysisTrend.push({
+      date: date.toISOString(),
+      general: generalCount,
+      master: masterCount,
+      total: generalCount + masterCount
+    });
   }
 
   // 5. Recent Users (for dashboard list)
@@ -216,9 +223,19 @@ export async function updateUserCredits(userId: string, credits: number) {
 
 // === Customer Support ===
 
-export async function getTickets() {
+export async function getTickets(status?: string, tag?: string) {
     await checkAdmin();
+    
+    const where: any = {};
+    if (status && status !== 'all') {
+        where.status = status;
+    }
+    if (tag) {
+        where.tags = { has: tag };
+    }
+
     const tickets = await prisma.ticket.findMany({
+        where,
         orderBy: { updatedAt: 'desc' },
         include: {
             user: {
@@ -227,6 +244,24 @@ export async function getTickets() {
         }
     });
     return tickets;
+}
+
+export async function updateTicketStatus(ticketId: string, status: string) {
+    await checkAdmin();
+    await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { status }
+    });
+    return { success: true };
+}
+
+export async function updateTicketTags(ticketId: string, tags: string[]) {
+    await checkAdmin();
+    await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { tags }
+    });
+    return { success: true };
 }
 
 export async function replyTicket(ticketId: string, reply: string) {

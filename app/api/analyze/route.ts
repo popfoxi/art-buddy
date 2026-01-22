@@ -101,6 +101,7 @@ export async function POST(req: Request) {
               imageUrl: image, // Note: storing base64 in DB is not ideal for production but works for now
               score: content.score || 0,
               result: JSON.stringify(content),
+              type: style ? "master_style" : "general",
             },
           });
         }

@@ -73,6 +73,7 @@ model Analysis {
   imageUrl  String   // URL of the uploaded/analyzed image
   score     Int?     // The score given by AI
   result    String?  @db.Text // Full analysis text
+  type      String   @default("general") // general (medium analysis), master_style (style challenge)
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -93,6 +94,7 @@ model Ticket {
   subject     String?
   content     String   @db.Text
   status      String   @default("open") // open, in_progress, closed
+  tags        String[] @default([])     // Tags for categorization
   reply       String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

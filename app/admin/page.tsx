@@ -48,7 +48,7 @@ export default function AdminPage() {
     totalAnalysis: 0,
     totalCredits: 0,
     recentUsers: [] as any[],
-    analysisTrend: [0, 0, 0, 0, 0, 0, 0]
+    analysisTrend: [] as { date: string, general: number, master: number, total: number }[]
   });
   const [users, setUsers] = useState<any[]>([]);
   const [tickets, setTickets] = useState<any[]>([]);
@@ -58,6 +58,7 @@ export default function AdminPage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [analysisTimeRange, setAnalysisTimeRange] = useState<'7d' | '30d'>('7d');
 
   // Modal States
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -68,6 +69,13 @@ export default function AdminPage() {
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [ticketReply, setTicketReply] = useState("");
   const [creditAmount, setCreditAmount] = useState(0);
+
+  // Ticket Filters & Tags
+  const [ticketStatusFilter, setTicketStatusFilter] = useState("open");
+  const [ticketTagFilter, setTicketTagFilter] = useState("");
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [editingTicketTags, setEditingTicketTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState("");
 
   // Settings State
   const [settings, setSettings] = useState<Record<string, string>>({});
@@ -87,9 +95,26 @@ export default function AdminPage() {
       }
   };
 
+  const loadTickets = async () => {
+    try {
+        const actions = await import("./actions");
+        const data = await actions.getTickets(ticketStatusFilter, ticketTagFilter);
+        setTickets(data);
+    } catch (error) {
+        console.error("Load tickets failed", error);
+    }
+  };
+
+  useEffect(() => {
+      if (activeTab === "support") {
+          loadTickets();
+      }
+  }, [ticketStatusFilter, ticketTagFilter, activeTab]);
+
   const handleSearch = () => {
     loadUsers();
   };
+
 
   // Load Data
   useEffect(() => {
@@ -197,11 +222,39 @@ export default function AdminPage() {
         setSelectedTicket(null);
         setTicketReply("");
         alert("回覆成功");
+        loadTickets(); // Reload to refresh list if status changed
     } catch (e) {
         console.error(e);
         alert("回覆失敗");
     }
   };
+
+  const handleUpdateTags = async () => {
+      if (!selectedTicket) return;
+      try {
+          const actions = await import("./actions");
+          await actions.updateTicketTags(selectedTicket.id, editingTicketTags);
+          setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, tags: editingTicketTags } : t));
+          setIsTagModalOpen(false);
+          setNewTagInput("");
+          alert("標籤更新成功");
+      } catch (e) {
+          console.error(e);
+          alert("更新失敗");
+      }
+  };
+
+  const handleAddTag = () => {
+      if (!newTagInput.trim()) return;
+      if (editingTicketTags.includes(newTagInput.trim())) return;
+      setEditingTicketTags([...editingTicketTags, newTagInput.trim()]);
+      setNewTagInput("");
+  };
+
+  const handleRemoveTag = (tag: string) => {
+      setEditingTicketTags(editingTicketTags.filter(t => t !== tag));
+  };
+
 
   const handleSaveSetting = async (key: string, value: string) => {
     setIsSaving(true);
@@ -225,10 +278,12 @@ export default function AdminPage() {
   // @ts-ignore - role is passed from session callback
   const isUserAdmin = session?.user?.email === adminEmail || session?.user?.role === 'admin';
 
-  // Mock Revenue Data (until real payments are integrated)
-  // Use real analysis trend data if available, otherwise fallback to 0s
-  const revenueData = stats.analysisTrend || [0, 0, 0, 0, 0, 0, 0];
-  const maxRevenue = Math.max(...revenueData) || 10; // Prevent division by zero
+  // Chart Data Preparation
+  const chartData = (stats.analysisTrend && stats.analysisTrend.length > 0)
+    ? (analysisTimeRange === '7d' ? stats.analysisTrend.slice(-7) : stats.analysisTrend)
+    : Array(7).fill({ date: '', general: 0, master: 0, total: 0 });
+
+  const maxCount = Math.max(...chartData.map(d => d.total), 10);
   
   if (status === "unauthenticated") {
     return (
@@ -372,15 +427,87 @@ export default function AdminPage() {
 
             {/* Chart */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-6">近 7 日 AI 分析次數趨勢</h3>
-                <div className="h-64 flex items-end justify-between gap-2">
-                    {revenueData.map((val, idx) => (
-                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
-                            <div className="relative w-full bg-blue-50 rounded-t-lg overflow-hidden group-hover:bg-blue-100 transition-colors" style={{ height: `${(val / maxRevenue) * 100}%` }}>
-                                <div className="absolute bottom-0 w-full bg-blue-500 h-0 transition-all duration-500" style={{ height: '100%' }}></div>
-                                <div className="absolute top-0 w-full text-center text-[10px] text-blue-600 font-bold mt-1 opacity-0 group-hover:opacity-100">{val}</div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">AI 分析次數趨勢</h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                      共 {chartData.reduce((a, b) => a + b.total, 0)} 次分析 
+                      (一般: {chartData.reduce((a, b) => a + b.general, 0)} | 
+                       大師: {chartData.reduce((a, b) => a + b.master, 0)})
+                    </p>
+                  </div>
+                  <div className="flex bg-slate-100 p-1 rounded-lg self-start">
+                    <button 
+                      onClick={() => setAnalysisTimeRange('7d')}
+                      className={clsx(
+                        "px-3 py-1 text-xs font-bold rounded-md transition-all",
+                        analysisTimeRange === '7d' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      近 7 天
+                    </button>
+                    <button 
+                      onClick={() => setAnalysisTimeRange('30d')}
+                      className={clsx(
+                        "px-3 py-1 text-xs font-bold rounded-md transition-all",
+                        analysisTimeRange === '30d' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      近 30 天
+                    </button>
+                  </div>
+                </div>
+
+                {/* Usage Ratio Bar */}
+                <div className="mb-6">
+                  <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        <span>媒介分析 (一般) {chartData.reduce((a,b)=>a+b.total,0) > 0 ? Math.round((chartData.reduce((a,b)=>a+b.general,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100) : 0}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                        <span>大師風格挑戰 {chartData.reduce((a,b)=>a+b.total,0) > 0 ? Math.round((chartData.reduce((a,b)=>a+b.master,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100) : 0}%</span>
+                    </div>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                    <div 
+                      className="h-full bg-blue-500" 
+                      style={{ width: `${chartData.reduce((a,b)=>a+b.total,0) > 0 ? (chartData.reduce((a,b)=>a+b.general,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100 : 0}%` }}
+                    />
+                    <div 
+                      className="h-full bg-purple-500" 
+                      style={{ width: `${chartData.reduce((a,b)=>a+b.total,0) > 0 ? (chartData.reduce((a,b)=>a+b.master,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="h-64 flex items-end justify-between gap-1 md:gap-2">
+                    {chartData.map((data, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-slate-900 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap shadow-lg">
+                              <div className="font-bold mb-1">{new Date(data.date).toLocaleDateString()}</div>
+                              <div>總計: {data.total}</div>
+                              <div className="text-blue-300">一般: {data.general}</div>
+                              <div className="text-purple-300">大師: {data.master}</div>
                             </div>
-                            <span className="text-xs font-bold text-slate-400">{idx === 6 ? 'Today' : `${6-idx}d ago`}</span>
+                            
+                            <div className="relative w-full bg-slate-50 rounded-t-sm md:rounded-t-lg overflow-hidden flex flex-col-reverse justify-start" style={{ height: `${maxCount > 0 ? (data.total / maxCount) * 100 : 0}%` }}>
+                                {/* General Bar (Blue) */}
+                                <div 
+                                  className="w-full bg-blue-500 transition-all duration-500" 
+                                  style={{ height: `${data.total > 0 ? (data.general / data.total) * 100 : 0}%` }}
+                                ></div>
+                                {/* Master Bar (Purple) */}
+                                <div 
+                                  className="w-full bg-purple-500 transition-all duration-500" 
+                                  style={{ height: `${data.total > 0 ? (data.master / data.total) * 100 : 0}%` }}
+                                ></div>
+                            </div>
+                            <span className="text-[10px] md:text-xs font-bold text-slate-400 hidden md:block">
+                              {idx % (analysisTimeRange === '30d' ? 5 : 1) === 0 ? new Date(data.date).toLocaleDateString(undefined, {month:'numeric', day:'numeric'}) : ''}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -559,15 +686,22 @@ export default function AdminPage() {
 
             {/* Revenue Chart */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-6">近 7 日 AI 分析次數趨勢 (Analysis Trend)</h3>
-                <div className="h-64 flex items-end justify-between gap-2">
-                    {revenueData.map((val, idx) => (
-                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
-                            <div className="relative w-full bg-blue-50 rounded-t-lg overflow-hidden group-hover:bg-blue-100 transition-colors" style={{ height: `${(val / maxRevenue) * 100}%` }}>
-                                <div className="absolute bottom-0 w-full bg-blue-500 h-0 transition-all duration-500" style={{ height: '100%' }}></div>
-                                <div className="absolute top-0 w-full text-center text-[10px] text-blue-600 font-bold mt-1 opacity-0 group-hover:opacity-100">{val}</div>
+                <h3 className="text-lg font-bold text-slate-900 mb-6">近 {analysisTimeRange === '7d' ? '7' : '30'} 日 AI 分析次數趨勢 (Analysis Trend)</h3>
+                <div className="h-64 flex items-end justify-between gap-1 md:gap-2">
+                    {chartData.map((data, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-slate-900 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap shadow-lg">
+                              <div className="font-bold mb-1">{new Date(data.date).toLocaleDateString()}</div>
+                              <div>總計: {data.total}</div>
                             </div>
-                            <span className="text-xs font-bold text-slate-400">{idx === 6 ? 'Today' : `${6-idx}d ago`}</span>
+
+                            <div className="relative w-full bg-blue-50 rounded-t-lg overflow-hidden group-hover:bg-blue-100 transition-colors" style={{ height: `${maxCount > 0 ? (data.total / maxCount) * 100 : 0}%` }}>
+                                <div className="absolute bottom-0 w-full bg-blue-500 h-0 transition-all duration-500" style={{ height: '100%' }}></div>
+                            </div>
+                            <span className="text-[10px] md:text-xs font-bold text-slate-400 hidden md:block">
+                                {idx % (analysisTimeRange === '30d' ? 5 : 1) === 0 ? new Date(data.date).toLocaleDateString(undefined, {month:'numeric', day:'numeric'}) : ''}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -658,14 +792,49 @@ export default function AdminPage() {
       case "support":
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">客服系統</h2>
+            <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-slate-900">客服系統</h2>
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button 
+                        onClick={() => setTicketStatusFilter("open")}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${ticketStatusFilter === 'open' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        待處理 (Pending)
+                    </button>
+                    <button 
+                        onClick={() => setTicketStatusFilter("closed")}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${ticketStatusFilter === 'closed' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        已結案 (Resolved)
+                    </button>
+                    <button 
+                        onClick={() => setTicketStatusFilter("all")}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${ticketStatusFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        全部 (All)
+                    </button>
+                </div>
+            </div>
             
+            {/* Tag Filter */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-4">
+                <Filter size={20} className="text-slate-400" />
+                <input 
+                    type="text" 
+                    value={ticketTagFilter}
+                    onChange={(e) => setTicketTagFilter(e.target.value)}
+                    placeholder="輸入標籤進行篩選 (例如: bug, refund)..." 
+                    className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 placeholder:font-normal" 
+                />
+            </div>
+
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <table className="w-full text-left">
                     <thead>
                         <tr className="bg-slate-50 border-b border-slate-100">
                             <th className="p-4 text-xs font-bold text-slate-500">用戶</th>
                             <th className="p-4 text-xs font-bold text-slate-500">主旨</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">標籤</th>
                             <th className="p-4 text-xs font-bold text-slate-500">狀態</th>
                             <th className="p-4 text-xs font-bold text-slate-500">時間</th>
                             <th className="p-4 text-xs font-bold text-slate-500">操作</th>
@@ -674,7 +843,7 @@ export default function AdminPage() {
                     <tbody className="divide-y divide-slate-50">
                         {tickets.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">目前沒有客訴案件</td>
+                                <td colSpan={6} className="p-8 text-center text-slate-400 text-sm">目前沒有符合條件的案件</td>
                             </tr>
                         ) : (
                             tickets.map((ticket) => (
@@ -688,6 +857,19 @@ export default function AdminPage() {
                                         </div>
                                     </td>
                                     <td className="p-4 text-sm text-slate-700 font-bold">{ticket.subject || "無主旨"}</td>
+                                    <td className="p-4">
+                                        <div className="flex flex-wrap gap-1">
+                                            {ticket.tags && ticket.tags.length > 0 ? (
+                                                ticket.tags.map((tag: string, idx: number) => (
+                                                    <span key={idx} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">
+                                                        {tag}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="text-slate-300 text-xs">-</span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
                                             ticket.status === 'open' ? 'bg-rose-100 text-rose-600' : 
@@ -707,6 +889,16 @@ export default function AdminPage() {
                                         </button>
                                         <button 
                                             onClick={() => {
+                                                setSelectedTicket(ticket);
+                                                setEditingTicketTags(ticket.tags || []);
+                                                setIsTagModalOpen(true);
+                                            }}
+                                            className="text-xs font-bold text-slate-600 hover:underline"
+                                        >
+                                            標籤
+                                        </button>
+                                        <button 
+                                            onClick={() => {
                                                 if (ticket.user) {
                                                     setSelectedUserForCredit(ticket.user);
                                                     setCreditAmount(ticket.user.credits || 0);
@@ -715,7 +907,7 @@ export default function AdminPage() {
                                             }}
                                             className="text-xs font-bold text-emerald-600 hover:underline"
                                         >
-                                            補償點數
+                                            補償
                                         </button>
                                     </td>
                                 </tr>
@@ -982,30 +1174,115 @@ export default function AdminPage() {
       )}
 
       {/* Ticket Reply Modal */}
-      {selectedTicket && (
+      {/* Ticket Reply Modal */}
+      {selectedTicket && !isTagModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
                 <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-bold text-slate-900">回覆客訴案件</h3>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900">回覆客訴案件</h3>
+                        <p className="text-xs text-slate-500 mt-1">案件 ID: {selectedTicket.id}</p>
+                    </div>
                     <button onClick={() => setSelectedTicket(null)}><X size={20} className="text-slate-400" /></button>
                 </div>
                 
-                <div className="bg-slate-50 p-4 rounded-xl space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <span className="text-rose-500">Q:</span> {selectedTicket.content}
+                <div className="space-y-4">
+                    <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">用戶描述</div>
+                        <div className="text-sm font-bold text-slate-700">{selectedTicket.subject}</div>
+                        <div className="text-sm text-slate-600 whitespace-pre-wrap">{selectedTicket.content}</div>
+                    </div>
+
+                    {selectedTicket.reply && (
+                        <div className="bg-emerald-50 p-4 rounded-xl space-y-2 border border-emerald-100">
+                            <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider">先前已回覆</div>
+                            <div className="text-sm text-emerald-700 whitespace-pre-wrap">{selectedTicket.reply}</div>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">回覆內容</label>
+                        <textarea 
+                            rows={4}
+                            value={ticketReply}
+                            onChange={(e) => setTicketReply(e.target.value)}
+                            placeholder="輸入回覆內容..."
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all resize-none"
+                        />
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => handleReplyTicket(selectedTicket.id)}
+                            className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+                        >
+                            傳送回覆並結案
+                        </button>
                     </div>
                 </div>
+            </div>
+        </div>
+      )}
 
-                <textarea 
-                    value={ticketReply}
-                    onChange={(e) => setTicketReply(e.target.value)}
-                    placeholder="輸入回覆內容..."
-                    className="w-full h-32 bg-white border border-slate-200 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-slate-900/10"
-                ></textarea>
+      {/* Ticket Tag Modal */}
+      {isTagModalOpen && selectedTicket && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900">管理標籤</h3>
+                        <p className="text-xs text-slate-500 mt-1">{selectedTicket.subject}</p>
+                    </div>
+                    <button onClick={() => setIsTagModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                </div>
 
-                <div className="flex justify-end gap-3">
-                    <button onClick={() => setSelectedTicket(null)} className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl">取消</button>
-                    <button onClick={() => handleReplyTicket(selectedTicket.id)} className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl">發送回覆</button>
+                <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2 min-h-[40px] p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        {editingTicketTags.length === 0 ? (
+                            <span className="text-slate-400 text-xs italic">尚未設定標籤</span>
+                        ) : (
+                            editingTicketTags.map((tag) => (
+                                <span key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs font-bold shadow-sm">
+                                    {tag}
+                                    <button onClick={() => handleRemoveTag(tag)} className="text-slate-400 hover:text-red-500 transition-colors">
+                                        <X size={14} />
+                                    </button>
+                                </span>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            value={newTagInput}
+                            onChange={(e) => setNewTagInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                            placeholder="輸入新標籤名稱..."
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+                        />
+                        <button 
+                            onClick={handleAddTag}
+                            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all"
+                        >
+                            新增
+                        </button>
+                    </div>
+
+                    <div className="pt-4 flex gap-3 border-t border-slate-100">
+                        <button 
+                            onClick={() => setIsTagModalOpen(false)}
+                            className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                        >
+                            取消
+                        </button>
+                        <button 
+                            onClick={handleUpdateTags}
+                            className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/10"
+                        >
+                            儲存標籤
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
