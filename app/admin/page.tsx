@@ -16,7 +16,9 @@ import {
   Filter,
   Download,
   DollarSign,
-  TrendingUp
+  TrendingUp,
+  CheckCircle2,
+  Save
 } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
@@ -37,6 +39,11 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Settings State
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
   // Load Data
   useEffect(() => {
     if (status === "loading" || !session) return;
@@ -49,6 +56,10 @@ export default function AdminPage() {
         
         const usersData = await actions.getUsers();
         setUsers(usersData);
+
+        // Load settings if needed (or load lazy)
+        const settingsData = await actions.getSystemSettings();
+        setSettings(settingsData);
       } catch (error) {
         console.error("Failed to fetch admin data", error);
       } finally {
@@ -57,10 +68,30 @@ export default function AdminPage() {
     });
   }, [session, status]);
 
+  const handleSaveSetting = async (key: string, value: string) => {
+    setIsSaving(true);
+    setSaveMessage("");
+    try {
+      const actions = await import("./actions");
+      await actions.updateSystemSetting(key, value);
+      setSaveMessage("設定已儲存");
+      setTimeout(() => setSaveMessage(""), 3000);
+    } catch (error) {
+      console.error(error);
+      alert("儲存失敗");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (status === "loading") return <div className="min-h-screen flex items-center justify-center bg-slate-50">載入中...</div>;
 
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   const isUserAdmin = session?.user?.email === adminEmail;
+
+  // Mock Revenue Data (until real payments are integrated)
+  const revenueData = [120, 300, 250, 400, 380, 500, 450];
+  const maxRevenue = Math.max(...revenueData);
 
   if (status === "unauthenticated") {
     return (

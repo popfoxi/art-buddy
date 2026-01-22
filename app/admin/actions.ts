@@ -63,7 +63,7 @@ export async function getAdminStats() {
     todayAnalysis,
     conversionRate: conversionRate.toFixed(1),
     monthlyRevenue,
-    recentUsers: recentUsers.map(u => ({
+    recentUsers: recentUsers.map((u: any) => ({
       ...u,
       provider: u.accounts[0]?.provider || "email",
     })),
@@ -119,7 +119,7 @@ export async function getUsers(query?: string, role?: string, plan?: string) {
     take: 50, // Limit to 50 for now
   });
 
-  return users.map(u => ({
+  return users.map((u: any) => ({
     id: u.id,
     name: u.name,
     email: u.email,
@@ -142,10 +142,11 @@ export async function getSystemSettings() {
 
   const settings = await prisma.systemSetting.findMany();
   // Convert array to object for easier consumption
-  return settings.reduce((acc, curr) => {
-    acc[curr.key] = curr.value;
-    return acc;
-  }, {} as Record<string, string>);
+  const result: Record<string, string> = {};
+  for (const setting of settings) {
+    result[setting.key] = setting.value;
+  }
+  return result;
 }
 
 export async function updateSystemSetting(key: string, value: string) {

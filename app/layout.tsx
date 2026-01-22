@@ -68,10 +68,10 @@ export default async function RootLayout({
     const settings = await prisma.systemSetting.findMany({
       where: { key: { in: ["ga4_id", "adsense_id"] } }
     });
-    const settingsMap = settings.reduce((acc, curr) => {
-      acc[curr.key] = curr.value;
-      return acc;
-    }, {} as Record<string, string>);
+    const settingsMap: Record<string, string> = {};
+    for (const setting of settings) {
+      settingsMap[setting.key] = setting.value;
+    }
     
     ga4Id = settingsMap["ga4_id"];
     adsenseId = settingsMap["adsense_id"];
