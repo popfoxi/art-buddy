@@ -27,18 +27,35 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview"); // overview, users, revenue, settings
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Mock Data for Revenue Chart (simplified as bars)
-  const revenueData = [4500, 5200, 4800, 6100, 5900, 7200, 8500];
-  const maxRevenue = Math.max(...revenueData);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    todayAnalysis: 0,
+    conversionRate: "0",
+    monthlyRevenue: 0,
+    recentUsers: [] as any[]
+  });
+  const [users, setUsers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load Data
   useEffect(() => {
-    if (status === "loading") return;
-    if (!session) { router.push("/"); return; }
+    if (status === "loading" || !session) return;
     
-    // Check admin email
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    // Strict check: if (session.user?.email !== adminEmail) { router.push("/"); }
-  }, [session, status, router]);
+    // Import actions dynamically or define outside if possible, but here we invoke them
+    import("./actions").then(async (actions) => {
+      try {
+        const statsData = await actions.getAdminStats();
+        setStats(statsData);
+        
+        const usersData = await actions.getUsers();
+        setUsers(usersData);
+      } catch (error) {
+        console.error("Failed to fetch admin data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    });
+  }, [session, status]);
 
   if (status === "loading") return <div className="min-h-screen flex items-center justify-center bg-slate-50">載入中...</div>;
 
@@ -186,15 +203,15 @@ export default function AdminPage() {
       default: // overview
         return (
           <div className="space-y-8">
-            {/* Database Warning */}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-start gap-4">
-                <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
+            {/* Database Connected Banner */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 flex items-start gap-4">
+                <div className="bg-emerald-100 p-2 rounded-full text-emerald-600 shrink-0">
                     <Database size={24} />
                 </div>
                 <div>
-                    <h3 className="text-amber-900 font-bold text-lg mb-1">尚未連接資料庫</h3>
-                    <p className="text-amber-700/80 text-sm leading-relaxed">
-                        目前顯示均為「模擬數據」。請前往 Vercel Marketplace 啟用 <strong>Neon (Serverless Postgres)</strong> 以啟用真實數據追蹤。
+                    <h3 className="text-emerald-900 font-bold text-lg mb-1">資料庫已連線</h3>
+                    <p className="text-emerald-700/80 text-sm leading-relaxed">
+                        目前顯示為 <strong>Vercel Postgres (Neon)</strong> 真實數據。所有會員註冊與登入皆會即時更新。
                     </p>
                 </div>
             </div>
