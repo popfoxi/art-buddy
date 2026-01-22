@@ -1769,7 +1769,7 @@ export default function Home() {
                 </div>
                 
                 <div className="text-center text-[10px] text-slate-400 pt-2 pb-4">
-                    v1.2.2 • Build 2026.01.22-4
+                    v1.3.0 • Build 2026.01.22-5 (Support)
                 </div>
             </div>
         )}
