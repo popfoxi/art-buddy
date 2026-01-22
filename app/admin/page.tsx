@@ -3,305 +3,339 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Shield, Users, Database, Activity, ArrowLeft } from "lucide-react";
+import { 
+  Shield, 
+  Users, 
+  Database, 
+  Activity, 
+  ArrowLeft, 
+  LayoutDashboard, 
+  CreditCard, 
+  Settings,
+  Search,
+  Filter,
+  Download,
+  DollarSign,
+  TrendingUp
+} from "lucide-react";
 import Link from "next/link";
+import { clsx } from "clsx";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview"); // overview, users, revenue, settings
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Mock Data for Revenue Chart (simplified as bars)
+  const revenueData = [4500, 5200, 4800, 6100, 5900, 7200, 8500];
+  const maxRevenue = Math.max(...revenueData);
 
   useEffect(() => {
     if (status === "loading") return;
-
-    if (!session) {
-      router.push("/");
-      return;
-    }
-
-    // Check if user is admin
-    // You should add your email to .env.local as NEXT_PUBLIC_ADMIN_EMAIL
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+    if (!session) { router.push("/"); return; }
     
-    // For testing purposes, we log the current user email to help you set it up
-    console.log("Current User Email:", session.user?.email);
-    console.log("Configured Admin Email:", adminEmail);
-
-    if (session.user?.email === adminEmail) {
-      setIsAdmin(true);
-    } else {
-      // alert("權限不足：您不是管理員");
-      // router.push("/");
-      // For now, let's allow viewing but show a warning if email doesn't match
-      // This helps you test without setting up env immediately, but in production this should be strict
-      // setIsAdmin(true); // Uncomment to force allow for testing
-    }
+    // Check admin email
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+    // Strict check: if (session.user?.email !== adminEmail) { router.push("/"); }
   }, [session, status, router]);
 
-  if (status === "loading") {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50">載入中...</div>;
-  }
+  if (status === "loading") return <div className="min-h-screen flex items-center justify-center bg-slate-50">載入中...</div>;
 
-  // Strict check for render
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   const isUserAdmin = session?.user?.email === adminEmail;
 
   if (!isUserAdmin) {
-     return (
+    return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
             <Shield size={64} className="text-slate-300 mb-4" />
             <h1 className="text-2xl font-bold text-slate-900 mb-2">權限不足</h1>
-            <p className="text-slate-500 text-center max-w-md mb-8">
-                此頁面僅限管理員存取。<br/>
-                請確認您已在 `.env` 檔案中設定 `NEXT_PUBLIC_ADMIN_EMAIL={session?.user?.email}`。
-            </p>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 mb-8 w-full max-w-md">
-                <p className="text-xs text-slate-400 font-bold mb-1">您的 Email</p>
-                <code className="block bg-slate-100 p-2 rounded text-sm break-all">{session?.user?.email}</code>
-            </div>
-            <Link href="/" className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">
-                回首頁
-            </Link>
+            <p className="text-slate-500 text-center max-w-md mb-8">此頁面僅限管理員存取。</p>
+            <Link href="/" className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold">回首頁</Link>
         </div>
-     );
+    );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                <ArrowLeft size={20} className="text-slate-600" />
-            </Link>
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Shield size={18} className="text-rose-500" />
-                總管理後台
-            </h1>
+  const renderContent = () => {
+    switch(activeTab) {
+      case "users":
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-slate-900">會員管理</h2>
+              <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors">
+                <Download size={16} /> 匯出報表
+              </button>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-wrap gap-4 items-center justify-between">
+               <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                  <Search size={20} className="text-slate-400" />
+                  <input type="text" placeholder="搜尋會員姓名、Email..." className="w-full bg-transparent outline-none text-sm font-bold text-slate-700 placeholder:font-normal" />
+               </div>
+               <div className="flex items-center gap-3">
+                  <select className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg px-3 py-2 outline-none">
+                    <option>所有等級</option>
+                    <option>免費會員</option>
+                    <option>Pro 會員</option>
+                  </select>
+                  <select className="bg-slate-50 border border-slate-200 text-slate-700 text-sm font-bold rounded-lg px-3 py-2 outline-none">
+                    <option>所有狀態</option>
+                    <option>正常</option>
+                    <option>停權</option>
+                  </select>
+               </div>
+            </div>
+
+            {/* User Table */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                            <th className="p-4 text-xs font-bold text-slate-500">會員資訊</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">登入方式</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">訂閱方案</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">消費總額</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">註冊時間</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">狀態</th>
+                            <th className="p-4 text-xs font-bold text-slate-500">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                            <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200" />
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-900">User {i}</div>
+                                            <div className="text-xs text-slate-400">user{i}@example.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <span className="flex items-center gap-1 text-xs font-bold text-slate-600">
+                                        {i % 2 === 0 ? "Google" : "LINE"}
+                                    </span>
+                                </td>
+                                <td className="p-4">
+                                    {i % 3 === 0 ? (
+                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600">Pro+</span>
+                                    ) : (
+                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Free</span>
+                                    )}
+                                </td>
+                                <td className="p-4 text-sm font-bold text-slate-900">${i * 150}</td>
+                                <td className="p-4 text-xs text-slate-400">2024/01/{10+i}</td>
+                                <td className="p-4"><span className="text-xs font-bold text-emerald-600">Active</span></td>
+                                <td className="p-4"><button className="text-xs font-bold text-blue-600 hover:underline">管理</button></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-             <div className="text-xs text-right hidden sm:block">
-                <div className="font-bold text-slate-900">{session?.user?.name}</div>
-                <div className="text-slate-400">超級管理員</div>
-             </div>
-             <img 
-                src={session?.user?.image || ""} 
-                alt="Admin" 
-                className="w-8 h-8 rounded-full bg-slate-200"
-             />
-          </div>
-        </div>
-      </header>
+        );
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-        
-        {/* Warning Banner about Database */}
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-start gap-4">
-            <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
-                <Database size={24} />
-            </div>
-            <div>
-                <h3 className="text-amber-900 font-bold text-lg mb-1">尚未連接資料庫</h3>
-                <p className="text-amber-700/80 text-sm leading-relaxed">
-                    目前系統運行在「無伺服器 (Serverless)」模式，會員資料與使用紀錄僅暫存在使用者的瀏覽器中 (LocalStorage)。
-                    <br/><br/>
-                    <strong>無法執行以下功能：</strong>
-                    <ul className="list-disc pl-5 mt-1 space-y-1">
-                        <li>查看所有註冊會員列表</li>
-                        <li>統計總分析次數</li>
-                        <li>管理特定會員權限</li>
-                    </ul>
-                    <br/>
-                    建議連接 <strong>Vercel Postgres</strong> 或 <strong>MongoDB</strong> 以啟用完整後台功能。
-                </p>
-            </div>
-        </div>
-
-        {/* Stats Grid (Mockup/Realtime Session) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="p-2 bg-blue-50 text-blue-500 rounded-lg">
-                        <Activity size={20} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">即時</span>
-                </div>
-                <div className="text-3xl font-black text-slate-900">運行中</div>
-                <div className="text-sm text-slate-500 mt-1">系統狀態正常</div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="p-2 bg-purple-50 text-purple-500 rounded-lg">
-                        <Users size={20} />
-                    </div>
-                    <span className="text-xs font-bold text-rose-500 bg-rose-50 px-2 py-1 rounded">模擬數據</span>
-                </div>
-                <div className="text-3xl font-black text-slate-900">1,248</div>
-                <div className="text-sm text-slate-500 mt-1">總註冊會員數 (範例)</div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="p-2 bg-emerald-50 text-emerald-500 rounded-lg">
-                        <Shield size={20} />
-                    </div>
-                </div>
-                <div className="text-3xl font-black text-slate-900">Plus</div>
-                <div className="text-sm text-slate-500 mt-1">最多訂閱方案 (範例)</div>
-            </div>
-        </div>
-
-        {/* Member List Mockup */}
-        <section>
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-slate-900">會員列表 (模擬預覽)</h2>
-                <div className="flex gap-2">
-                    <button className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">匯出 CSV</button>
-                    <button className="px-3 py-1.5 bg-rose-500 text-white rounded-lg text-xs font-bold hover:bg-rose-600">新增會員</button>
-                </div>
-            </div>
+      case "revenue":
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-slate-900">營收報表</h2>
             
+            {/* Revenue Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="text-sm text-slate-500 font-bold mb-1">本月總營收</div>
+                    <div className="text-3xl font-black text-slate-900">$12,450</div>
+                    <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
+                        <TrendingUp size={14} /> +15.3% 較上月
+                    </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="text-sm text-slate-500 font-bold mb-1">活躍訂閱數</div>
+                    <div className="text-3xl font-black text-slate-900">482</div>
+                    <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
+                        <TrendingUp size={14} /> +8.1% 較上月
+                    </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="text-sm text-slate-500 font-bold mb-1">平均客單價 (ARPU)</div>
+                    <div className="text-3xl font-black text-slate-900">$25.8</div>
+                    <div className="text-xs font-bold text-slate-400 mt-2">持平</div>
+                </div>
+            </div>
+
+            {/* Revenue Chart */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-6">近 7 日營收趨勢</h3>
+                <div className="h-64 flex items-end justify-between gap-2">
+                    {revenueData.map((val, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group">
+                            <div className="relative w-full bg-blue-50 rounded-t-lg overflow-hidden group-hover:bg-blue-100 transition-colors" style={{ height: `${(val / maxRevenue) * 100}%` }}>
+                                <div className="absolute bottom-0 w-full bg-blue-500 h-0 transition-all duration-500" style={{ height: '100%' }}></div>
+                            </div>
+                            <span className="text-xs font-bold text-slate-400">{idx + 1}日</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+          </div>
+        );
+
+      default: // overview
+        return (
+          <div className="space-y-8">
+            {/* Database Warning */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-start gap-4">
+                <div className="bg-amber-100 p-2 rounded-full text-amber-600 shrink-0">
+                    <Database size={24} />
+                </div>
+                <div>
+                    <h3 className="text-amber-900 font-bold text-lg mb-1">尚未連接資料庫</h3>
+                    <p className="text-amber-700/80 text-sm leading-relaxed">
+                        目前顯示均為「模擬數據」。請前往 Vercel Marketplace 啟用 <strong>Neon (Serverless Postgres)</strong> 以啟用真實數據追蹤。
+                    </p>
+                </div>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={18} /></div>
+                        <span className="text-xs font-bold text-slate-500">總會員數</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">1,248</div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><DollarSign size={18} /></div>
+                        <span className="text-xs font-bold text-slate-500">本月營收</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">$12.4k</div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Activity size={18} /></div>
+                        <span className="text-xs font-bold text-slate-500">今日分析</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">342</div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><Shield size={18} /></div>
+                        <span className="text-xs font-bold text-slate-500">付費轉換率</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">4.2%</div>
+                </div>
+            </div>
+
+            {/* Recent Users Table Preview */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900">最新註冊會員</h3>
+                    <button onClick={() => setActiveTab("users")} className="text-xs font-bold text-blue-600 hover:underline">查看全部</button>
+                </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="p-4 text-xs font-bold text-slate-500">用戶資訊</th>
-                                <th className="p-4 text-xs font-bold text-slate-500">登入方式</th>
-                                <th className="p-4 text-xs font-bold text-slate-500">會員等級</th>
-                                <th className="p-4 text-xs font-bold text-slate-500">分析次數</th>
-                                <th className="p-4 text-xs font-bold text-slate-500">註冊日期</th>
-                                <th className="p-4 text-xs font-bold text-slate-500">狀態</th>
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50">
+                            <tr>
+                                <th className="p-4 text-xs font-bold text-slate-500">用戶</th>
+                                <th className="p-4 text-xs font-bold text-slate-500">來源</th>
+                                <th className="p-4 text-xs font-bold text-slate-500">日期</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {/* Mock Data Row 1: Admin */}
-                            <tr className="hover:bg-slate-50/50 transition-colors">
-                                <td className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
-                                            <img src={session?.user?.image || "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin"} alt="User" />
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-bold text-slate-900">{session?.user?.name || "Irisa Ho"}</div>
-                                            <div className="text-xs text-slate-400">{session?.user?.email || "admin@example.com"}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                                        <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">G</div>
-                                        Google
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-200">
-                                        Pro+ 會員
-                                    </span>
-                                </td>
-                                <td className="p-4 text-sm text-slate-600 font-bold">142 次</td>
-                                <td className="p-4 text-xs text-slate-400">2024/01/15</td>
-                                <td className="p-4">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-2"></span>
-                                    <span className="text-xs font-bold text-emerald-600">正常</span>
-                                </td>
-                            </tr>
-
-                            {/* Mock Data Row 2: Free User */}
-                            <tr className="hover:bg-slate-50/50 transition-colors">
-                                <td className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500 text-xs font-bold">
-                                            AL
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-bold text-slate-900">Alex Chen</div>
-                                            <div className="text-xs text-slate-400">alex.chen@test.com</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                                        <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-600">L</div>
-                                        LINE
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                                        免費會員
-                                    </span>
-                                </td>
-                                <td className="p-4 text-sm text-slate-600 font-bold">5 次</td>
-                                <td className="p-4 text-xs text-slate-400">2024/02/01</td>
-                                <td className="p-4">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-2"></span>
-                                    <span className="text-xs font-bold text-emerald-600">正常</span>
-                                </td>
-                            </tr>
-
-                            {/* Mock Data Row 3: Plus User */}
-                            <tr className="hover:bg-slate-50/50 transition-colors">
-                                <td className="p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-amber-100 overflow-hidden">
-                                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="User" />
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-bold text-slate-900">Sarah Wu</div>
-                                            <div className="text-xs text-slate-400">sarah.wu@gmail.com</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                                        <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">G</div>
-                                        Google
-                                    </div>
-                                </td>
-                                <td className="p-4">
-                                    <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-600 border border-purple-200">
-                                        Plus 會員
-                                    </span>
-                                </td>
-                                <td className="p-4 text-sm text-slate-600 font-bold">28 次</td>
-                                <td className="p-4 text-xs text-slate-400">2024/01/20</td>
-                                <td className="p-4">
-                                    <span className="w-2 h-2 rounded-full bg-amber-500 inline-block mr-2"></span>
-                                    <span className="text-xs font-bold text-amber-600">待續費</span>
-                                </td>
-                            </tr>
+                             {[1, 2, 3].map(i => (
+                                <tr key={i}>
+                                    <td className="p-4 flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-slate-200" />
+                                        <span className="text-sm font-bold text-slate-700">New User {i}</span>
+                                    </td>
+                                    <td className="p-4 text-xs font-bold text-slate-500">Google</td>
+                                    <td className="p-4 text-xs text-slate-400">10 mins ago</td>
+                                </tr>
+                             ))}
                         </tbody>
                     </table>
                 </div>
-                <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                    <p className="text-xs text-slate-400">僅顯示前 3 筆模擬資料，請連接資料庫以查看完整列表</p>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex font-sans">
+      {/* Sidebar */}
+      <aside className="w-64 bg-white border-r border-slate-200 fixed h-full z-20 hidden md:flex flex-col">
+        <div className="p-6 border-b border-slate-100">
+            <Link href="/" className="flex items-center gap-2 text-slate-900 hover:opacity-70 transition-opacity">
+                <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center text-white font-black">A</div>
+                <span className="font-bold text-lg">ArtBuddy Admin</span>
+            </Link>
+        </div>
+        <nav className="flex-1 p-4 space-y-1">
+            <button 
+                onClick={() => setActiveTab("overview")}
+                className={clsx("w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors", activeTab === "overview" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50")}
+            >
+                <LayoutDashboard size={18} />
+                總覽儀表板
+            </button>
+            <button 
+                onClick={() => setActiveTab("users")}
+                className={clsx("w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors", activeTab === "users" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50")}
+            >
+                <Users size={18} />
+                會員管理
+            </button>
+            <button 
+                onClick={() => setActiveTab("revenue")}
+                className={clsx("w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors", activeTab === "revenue" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50")}
+            >
+                <CreditCard size={18} />
+                營收報表
+            </button>
+            <div className="pt-4 mt-4 border-t border-slate-100">
+                <button 
+                    onClick={() => setActiveTab("settings")}
+                    className={clsx("w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors", activeTab === "settings" ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50")}
+                >
+                    <Settings size={18} />
+                    系統設定
+                </button>
+            </div>
+        </nav>
+        <div className="p-4 border-t border-slate-100">
+            <div className="flex items-center gap-3 px-4 py-2">
+                <img src={session?.user?.image || ""} className="w-8 h-8 rounded-full bg-slate-200" />
+                <div className="overflow-hidden">
+                    <div className="text-sm font-bold text-slate-900 truncate">{session?.user?.name}</div>
+                    <div className="text-xs text-slate-400">Super Admin</div>
                 </div>
             </div>
-        </section>
+        </div>
+      </aside>
 
-        {/* Action Area */}
-        <section>
-            <h2 className="text-xl font-bold text-slate-900 mb-4">開發者工具</h2>
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer" onClick={() => alert("功能開發中")}>
-                    <div>
-                        <div className="font-bold text-slate-900">清除系統緩存</div>
-                        <div className="text-xs text-slate-500">重置所有本地暫存數據</div>
-                    </div>
-                    <button className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold">執行</button>
-                </div>
-                <div className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between cursor-pointer" onClick={() => alert("功能開發中")}>
-                    <div>
-                        <div className="font-bold text-slate-900">測試 AI 分析接口</div>
-                        <div className="text-xs text-slate-500">發送測試請求以驗證 OpenAI 連線</div>
-                    </div>
-                    <button className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold">執行</button>
-                </div>
+      {/* Main Content */}
+      <main className="flex-1 md:ml-64 min-h-screen">
+        <header className="h-16 bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-10 px-6 flex items-center justify-between">
+            <h1 className="text-lg font-bold text-slate-900 capitalize">
+                {activeTab === "overview" ? "總覽儀表板" : 
+                 activeTab === "users" ? "會員管理" : 
+                 activeTab === "revenue" ? "營收報表" : "系統設定"}
+            </h1>
+            <div className="flex items-center gap-4">
+                <Link href="/" className="text-xs font-bold text-slate-500 hover:text-slate-900 flex items-center gap-1">
+                    回前台 <ArrowLeft size={14} />
+                </Link>
             </div>
-        </section>
-
+        </header>
+        <div className="p-6 max-w-7xl mx-auto">
+            {renderContent()}
+        </div>
       </main>
     </div>
   );
