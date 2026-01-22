@@ -1559,7 +1559,7 @@ export default function Home() {
                             <h2 className="text-lg font-black text-slate-900">{session?.user?.name || "訪客用戶"}</h2>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">
-                                    {session ? "會員" : "免費版"}
+                                    {session ? "免費會員" : "訪客"}
                                 </span>
                                 <span className="text-[10px] text-rose-500 font-bold">
                                     {session 
@@ -1628,7 +1628,7 @@ export default function Home() {
                             <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
                                 <CreditCard size={16} />
                             </div>
-                            <span className="text-sm font-bold text-slate-700">升級 Pro 方案</span>
+                            <span className="text-sm font-bold text-slate-700">升級 Plus 方案</span>
                         </div>
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
@@ -1672,7 +1672,7 @@ export default function Home() {
                 </div>
                 
                 <div className="text-center text-[10px] text-slate-400 pt-2 pb-4">
-                    v1.2.0 • Build 2026.01.22-2
+                    v1.2.1 • Build 2026.01.22-3
                 </div>
             </div>
         )}
