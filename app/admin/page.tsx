@@ -569,9 +569,9 @@ export default function AdminPage() {
 
             {/* Trend Chart */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">AI 分析趨勢 (Trends)</h3>
+                    <h3 className="text-lg font-bold text-slate-900">AI 分析趨勢</h3>
                     {(() => {
                         const total = chartData.reduce((a, b) => a + b.total, 0);
                         const paid = chartData.reduce((a, b) => a + (b.paid || 0), 0);
@@ -635,7 +635,15 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="h-64 flex items-end justify-between gap-1 md:gap-2">
+                <div className="h-32 flex items-end justify-between gap-1 md:gap-2 relative">
+                    {totalChartAnalysis === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10 backdrop-blur-[1px]">
+                            <div className="text-center">
+                                <div className="text-slate-300 font-bold text-sm mb-1">尚無足夠資料</div>
+                                <div className="text-slate-200 text-xs">累積更多分析後將顯示趨勢</div>
+                            </div>
+                        </div>
+                    )}
                     {chartData.map((data, idx) => (
                         <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
                             {/* Tooltip */}
@@ -827,7 +835,7 @@ export default function AdminPage() {
             {/* Block 1: Revenue Overview */}
             <div className="space-y-4">
                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
-                    營收總覽 (Revenue Overview)
+                    營收總覽
                  </h3>
                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* Today's Revenue */}
@@ -875,50 +883,66 @@ export default function AdminPage() {
             {/* Block 2: Revenue Structure */}
             <div className="space-y-4">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-l-4 border-blue-500 pl-3">
-                    營收來源結構 (Revenue Structure)
+                    本月營收來源結構 (MTD)
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* By Plan */}
                     <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <h4 className="text-sm font-bold text-slate-900 mb-4">A. 依方案拆分 (By Plan)</h4>
+                        <h4 className="text-sm font-bold text-slate-900 mb-4">A. 依方案拆分</h4>
                         <div className="space-y-4">
-                            {/* Plus */}
-                            <div>
-                                <div className="flex justify-between text-sm font-bold mb-1">
-                                    <span className="text-blue-600">Plus 方案 (NT$150)</span>
-                                    <span className="text-slate-900">NT$ {stats.revenueMetrics?.revenuePlus?.toLocaleString()}</span>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                    <div className="bg-blue-500 h-full" style={{ width: `${stats.revenueMetrics?.monthlyRevenue > 0 ? (stats.revenueMetrics.revenuePlus / stats.revenueMetrics.monthlyRevenue * 100) : 0}%` }}></div>
-                                </div>
-                            </div>
-                            {/* Pro */}
-                            <div>
-                                <div className="flex justify-between text-sm font-bold mb-1">
-                                    <span className="text-rose-600">Pro 方案 (NT$300)</span>
-                                    <span className="text-slate-900">NT$ {stats.revenueMetrics?.revenuePro?.toLocaleString()}</span>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                    <div className="bg-rose-500 h-full" style={{ width: `${stats.revenueMetrics?.monthlyRevenue > 0 ? (stats.revenueMetrics.revenuePro / stats.revenueMetrics.monthlyRevenue * 100) : 0}%` }}></div>
-                                </div>
-                            </div>
-                            {/* Add-on (Placeholder) */}
-                            <div>
-                                <div className="flex justify-between text-sm font-bold mb-1">
-                                    <span className="text-slate-500">次數加購 (Add-ons)</span>
-                                    <span className="text-slate-900">NT$ 0</span>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-2"></div>
-                            </div>
-                        </div>
-                        <div className="mt-4 p-3 bg-slate-50 rounded-xl text-xs text-slate-500">
-                            💡 提示: 若 Plus 收入佔比過高，可考慮提升 Pro 方案的吸引力或調整定價。
+                            {(() => {
+                                const totalRev = stats.revenueMetrics?.monthlyRevenue || 0;
+                                const revPlus = stats.revenueMetrics?.revenuePlus || 0;
+                                const revPro = stats.revenueMetrics?.revenuePro || 0;
+                                const pctPlus = totalRev > 0 ? Math.round((revPlus / totalRev) * 100) : 0;
+                                const pctPro = totalRev > 0 ? Math.round((revPro / totalRev) * 100) : 0;
+                                
+                                return (
+                                    <>
+                                        {/* Plus */}
+                                        <div>
+                                            <div className="flex justify-between text-sm font-bold mb-1">
+                                                <span className="text-blue-600">Plus 方案</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-900">NT$ {revPlus.toLocaleString()}</span>
+                                                    <span className="text-xs text-slate-400">({pctPlus}%)</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                <div className="bg-blue-500 h-full" style={{ width: `${pctPlus}%` }}></div>
+                                            </div>
+                                        </div>
+                                        {/* Pro */}
+                                        <div>
+                                            <div className="flex justify-between text-sm font-bold mb-1">
+                                                <span className="text-rose-600">Pro 方案</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-slate-900">NT$ {revPro.toLocaleString()}</span>
+                                                    <span className="text-xs text-slate-400">({pctPro}%)</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                <div className="bg-rose-500 h-full" style={{ width: `${pctPro}%` }}></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6 p-3 bg-slate-50 rounded-xl text-xs text-slate-500 flex items-start gap-2">
+                                            <span className="text-base">💡</span>
+                                            <div>
+                                                {totalRev === 0 ? "尚無營收數據。" : 
+                                                 revPro > revPlus ? "Pro 方案貢獻主要營收，建議維持高階功能優勢。" :
+                                                 "Plus 方案佔比高，可嘗試引導用戶升級至 Pro 以提升客單價。"}
+                                            </div>
+                                        </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
 
                     {/* Subscription vs One-time */}
                     <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <h4 className="text-sm font-bold text-slate-900 mb-4">B. 訂閱 vs 加購比例 (Recurring vs One-time)</h4>
+                        <h4 className="text-sm font-bold text-slate-900 mb-4">B. 訂閱 vs 加購比例</h4>
                         <div className="flex items-center gap-8">
                              <div className="relative w-32 h-32 rounded-full border-[12px] border-emerald-500 flex items-center justify-center">
                                  <div className="text-center">
@@ -950,7 +974,7 @@ export default function AdminPage() {
             {/* Block 3: Revenue x Usage */}
             <div className="space-y-4">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-l-4 border-rose-500 pl-3">
-                    營收 × 使用關係 (Profitability - Last 7 Days)
+                    營收 × 使用關係 (近 7 日)
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* Total Analysis (7d) */}
