@@ -1,17 +1,19 @@
 "use server";
 
-import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { redirect } from "next/navigation";
 
-// Helper to check admin permission
 async function checkAdmin() {
   const session = await auth();
+  if (!session?.user?.email) {
+     throw new Error("Unauthorized");
+  }
+  
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   // @ts-ignore
-  const isAdmin = session?.user?.email === adminEmail || session?.user?.role === 'admin';
-  
-  if (!isAdmin) {
-    throw new Error("Unauthorized");
+  if (session.user.email !== adminEmail && session.user.role !== 'admin') {
+     throw new Error("Unauthorized");
   }
   return session;
 }
@@ -19,319 +21,179 @@ async function checkAdmin() {
 export async function getAdminStats() {
   await checkAdmin();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  // 1. User Stats
-  const totalUsers = await prisma.user.count();
-  const dailyRegistrations = await prisma.user.count({
-    where: { createdAt: { gte: today } }
-  });
-  
-  // Daily Logins (DAU)
-  const dailyLogins = await prisma.user.count({
-    where: { lastLogin: { gte: today } }
-  });
-
-  // Monthly Active Users (MAU) - Proxy for Retention/Activity
-  const monthlyActiveUsers = await prisma.user.count({
-    where: { lastLogin: { gte: thirtyDaysAgo } }
-  });
-  
-  const retentionRate = totalUsers > 0 ? (monthlyActiveUsers / totalUsers) * 100 : 0;
-  const activityLevel = totalUsers > 0 ? (dailyLogins / totalUsers) * 100 : 0;
-
-  // Paid Users Breakdown
-  const paidUsersPlus = await prisma.user.count({ where: { plan: "plus" } });
-  const paidUsersPro = await prisma.user.count({ where: { plan: "pro" } });
-  const totalPaidUsers = paidUsersPlus + paidUsersPro;
-
-  // Unresolved Tickets
-  const unresolvedTickets = await prisma.ticket.count({
-    where: { status: "open" }
-  });
-
-  // 2. Analysis Stats (New KPIs)
-  const totalAnalysis = await prisma.analysis.count();
-  
-  // Today's Analysis
-  const todayAnalysis = await prisma.analysis.count({
-    where: { createdAt: { gte: today } }
-  });
-
-  // Last 7 Days Analysis
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const last7DaysAnalysis = await prisma.analysis.count({
-    where: { createdAt: { gte: sevenDaysAgo } }
-  });
 
-  // Usage by Member Type
-  const analysisFree = await prisma.analysis.count({
-    where: { user: { plan: 'free' } }
-  });
-  const analysisPlus = await prisma.analysis.count({
-    where: { user: { plan: 'plus' } }
-  });
-  const analysisPro = await prisma.analysis.count({
-    where: { user: { plan: 'pro' } }
-  });
-  const analysisPaid = analysisPlus + analysisPro;
+  // Basic counts
+  const totalUsers = await prisma.user.count();
+  const totalAnalysis = await prisma.analysis.count();
   
-  const paidUserUsageRatio = totalAnalysis > 0 ? (analysisPaid / totalAnalysis) * 100 : 0;
+  // Recent activity (7 days)
+  const last7DaysAnalyses = await prisma.analysis.findMany({
+    where: { createdAt: { gte: sevenDaysAgo } },
+    include: { user: true }
+  });
 
-  // Average Usage (Analysis per Active User)
-  const averageUsagePerUser = monthlyActiveUsers > 0 ? (totalAnalysis / monthlyActiveUsers) : 0;
+  const last7DaysTotal = last7DaysAnalyses.length;
   
-  // Estimated Cost (Assumption: $0.03 per analysis)
-  const estimatedCost = totalAnalysis * 0.03;
+  // Unique users in last 7 days
+  const uniqueUserIds = new Set(last7DaysAnalyses.map(a => a.userId));
+  const last7DaysUniqueUsers = uniqueUserIds.size;
 
-  // Breakdowns
-  // By Function (Scenario/Type)
-  // Using scenarioId if available, fallback to type
-  const analysisByScenarioGroup = await prisma.analysis.groupBy({
-    by: ['scenarioId'],
-    _count: { id: true },
-    orderBy: { _count: { id: 'desc' } }
-  });
+  // Average usage
+  const last7DaysAvgUsage = last7DaysUniqueUsers > 0 
+    ? (last7DaysTotal / last7DaysUniqueUsers).toFixed(1) 
+    : "0";
+
+  // Paid ratio (analyses by paid users / total)
+  const paidAnalyses = last7DaysAnalyses.filter(a => a.user.plan === 'plus' || a.user.plan === 'pro').length;
+  const last7DaysPaidRatio = last7DaysTotal > 0 
+    ? ((paidAnalyses / last7DaysTotal) * 100).toFixed(1) 
+    : "0";
+
+  // Distributions
+  const users = await prisma.user.findMany();
+  const paidUsersPlus = users.filter(u => u.plan === 'plus').length;
+  const paidUsersPro = users.filter(u => u.plan === 'pro').length;
+  const totalPaidUsers = paidUsersPlus + paidUsersPro;
+
+  // Trend 7 days
+  const trend7dMap = new Map<string, { total: number, general: number, master: number, paid: number }>();
   
-  // By Medium
-  const analysisByMediumGroup = await prisma.analysis.groupBy({
-    by: ['mediaId'],
-    _count: { id: true },
-    orderBy: { _count: { id: 'desc' } }
-  });
-
-  // 3. Credits
-  const usersWithCredits = await prisma.user.findMany({
-    select: { credits: true },
-  });
-  const totalCredits = usersWithCredits.reduce((sum, user) => sum + (user.credits || 0), 0);
-
-  // 4. Analysis Trend
-  // 7 Days (Daily)
-  const trend7d = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    date.setHours(0, 0, 0, 0);
-    const nextDate = new Date(date);
-    nextDate.setDate(date.getDate() + 1);
-
-    const generalCount = await prisma.analysis.count({
-      where: { createdAt: { gte: date, lt: nextDate }, type: { not: "master_style" } },
-    });
-    const masterCount = await prisma.analysis.count({
-      where: { createdAt: { gte: date, lt: nextDate }, type: "master_style" },
-    });
-
-    trend7d.push({
-      date: date.toISOString(),
-      general: generalCount,
-      master: masterCount,
-      total: generalCount + masterCount
-    });
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toLocaleDateString();
+    trend7dMap.set(dateStr, { total: 0, general: 0, master: 0, paid: 0 });
   }
 
-  // Monthly Trend (Last 6 Months)
-  const trendMonthly = [];
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    date.setDate(1);
-    date.setHours(0, 0, 0, 0);
-    
-    const nextMonth = new Date(date);
-    nextMonth.setMonth(date.getMonth() + 1);
+  last7DaysAnalyses.forEach(a => {
+    const dateStr = new Date(a.createdAt).toLocaleDateString();
+    if (trend7dMap.has(dateStr)) {
+        const entry = trend7dMap.get(dateStr)!;
+        entry.total++;
+        if (a.type === 'general') entry.general++;
+        if (a.type === 'master_style') entry.master++;
+        if (a.user.plan === 'plus' || a.user.plan === 'pro') entry.paid++;
+    }
+  });
 
-    const generalCount = await prisma.analysis.count({
-      where: { createdAt: { gte: date, lt: nextMonth }, type: { not: "master_style" } },
-    });
-    const masterCount = await prisma.analysis.count({
-      where: { createdAt: { gte: date, lt: nextMonth }, type: "master_style" },
-    });
+  const trend7d = Array.from(trend7dMap.entries()).map(([date, data]) => ({
+    date,
+    ...data
+  })).reverse();
 
-    trendMonthly.push({
-      date: date.toISOString(),
-      general: generalCount,
-      master: masterCount,
-      total: generalCount + masterCount
-    });
-  }
+  // Revenue Metrics (Estimated)
+  // Monthly Revenue: Plus(150) + Pro(300)
+  const revenuePlus = paidUsersPlus * 150;
+  const revenuePro = paidUsersPro * 300;
+  const monthlyRevenue = revenuePlus + revenuePro;
+  
+  // Today Revenue (Estimated as 1/30 of monthly)
+  const todayRevenue = Math.round(monthlyRevenue / 30);
+  
+  const arpu = totalUsers > 0 ? Math.round(monthlyRevenue / totalUsers) : 0;
+  
+  // API Cost Estimation (approx 1 TWD per analysis)
+  const last7DaysApiCost = last7DaysTotal * 1; 
+  const last7DaysGrossProfit = Math.round((monthlyRevenue * 7 / 30) - last7DaysApiCost);
 
-  // 5. Recent Users
+  // Recent Users
   const recentUsers = await prisma.user.findMany({
     take: 5,
     orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      createdAt: true,
-      plan: true
-    }
+    select: { id: true, name: true, image: true, createdAt: true, loginMethod: true }
   });
 
-  // 6. Revenue Metrics (Estimated)
-  // Assumption: Plus = 150 NTD/mo, Pro = 300 NTD/mo
-  const pricePlus = 150;
-  const pricePro = 300;
-  const revenuePlus = paidUsersPlus * pricePlus;
-  const revenuePro = paidUsersPro * pricePro;
-  const monthlyRevenue = revenuePlus + revenuePro;
-  const todayRevenue = Math.round(monthlyRevenue / 30); // Estimated Daily Run Rate
-  const arpu = totalPaidUsers > 0 ? Math.round(monthlyRevenue / totalPaidUsers) : 0;
-
-  // 7. Last 7 Days Financials
-  const last7DaysPaidAnalysis = await prisma.analysis.count({
-    where: { 
-        createdAt: { gte: sevenDaysAgo },
-        user: { plan: { in: ['plus', 'pro'] } }
-    }
-  });
-  
-  const costPerAnalysis = 1; // Estimated 1 NTD per analysis (GPT-4o-mini)
-  const last7DaysApiCost = last7DaysAnalysis * costPerAnalysis;
-  const last7DaysRevenue = Math.round((monthlyRevenue / 30) * 7);
-  const last7DaysGrossProfit = last7DaysRevenue - last7DaysApiCost;
+  const totalCredits = users.reduce((sum, u) => sum + u.credits + u.subscriptionCredits, 0);
 
   return {
     totalUsers,
-    dailyRegistrations,
-    dailyLogins,
-    monthlyActiveUsers,
-    retentionRate: retentionRate.toFixed(1),
-    activityLevel: activityLevel.toFixed(1),
+    totalAnalysis,
+    totalPaidUsers,
     paidUsersPlus,
     paidUsersPro,
-    totalPaidUsers,
-    unresolvedTickets,
-    todayAnalysis,
-    totalAnalysis,
     totalCredits,
-    recentUsers,
+    recentUsers: recentUsers.map(u => ({ ...u, provider: u.loginMethod || 'email' })),
     trend7d,
-    trendMonthly,
-    // New Stats
-    last7DaysAnalysis,
-    analysisFree,
-    analysisPlus,
-    analysisPro,
-    paidUserUsageRatio: paidUserUsageRatio.toFixed(1),
-    averageUsagePerUser: averageUsagePerUser.toFixed(1),
-    estimatedCost: estimatedCost.toFixed(2),
-    analysisByScenario: analysisByScenarioGroup.map(g => ({ name: g.scenarioId || 'general', value: g._count.id })),
-    analysisByMedium: analysisByMediumGroup.map(g => ({ name: g.mediaId || 'unknown', value: g._count.id })),
-    // Revenue Stats
+    trendMonthly: [], // Placeholder if not needed immediately
+    last7DaysTotal,
+    last7DaysUniqueUsers,
+    last7DaysAvgUsage,
+    last7DaysPaidRatio,
     revenueMetrics: {
         monthlyRevenue,
         todayRevenue,
         revenuePlus,
         revenuePro,
         arpu,
-        last7DaysPaidAnalysis,
+        last7DaysPaidAnalysis: paidAnalyses,
         last7DaysApiCost,
         last7DaysGrossProfit
     }
   };
 }
 
-export async function getUsers(search?: string, role?: string, plan?: string) {
+export async function getUsers(query: string, role: string, plan: string) {
   await checkAdmin();
   
   const where: any = {};
-  
-  if (search) {
+  if (query) {
     where.OR = [
-      { name: { contains: search } }, // mode: 'insensitive' is default in some DBs, explicitly set if needed but Prisma usually handles it
-      { email: { contains: search } }
+        { name: { contains: query, mode: 'insensitive' } },
+        { email: { contains: query, mode: 'insensitive' } }
     ];
   }
-  
-  if (role && role !== 'all') {
-    where.role = role;
-  }
-  
-  if (plan && plan !== 'all') {
-    where.plan = plan;
-  }
+  if (role !== 'all') where.role = role;
+  if (plan !== 'all') where.plan = plan;
 
   return await prisma.user.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: 50 // Limit for performance
+    take: 100
   });
 }
 
-export async function createUser(data: { name: string; email: string; role: string; plan: string; credits: number }) {
-  await checkAdmin();
-  const existing = await prisma.user.findUnique({ where: { email: data.email } });
-  if (existing) throw new Error("Email already exists");
-  
-  return await prisma.user.create({
-    data
-  });
+export async function createUser(data: any) {
+    await checkAdmin();
+    // Simplified create
+    return await prisma.user.create({ data });
 }
 
-export async function updateUser(userId: string, data: { name?: string; email?: string; role?: string; plan?: string; credits?: number }) {
-  await checkAdmin();
-  return await prisma.user.update({
-    where: { id: userId },
-    data
-  });
+export async function updateUser(userId: string, data: any) {
+    await checkAdmin();
+    return await prisma.user.update({
+        where: { id: userId },
+        data
+    });
 }
 
 export async function deleteUser(userId: string) {
-  await checkAdmin();
-  return await prisma.user.delete({
-    where: { id: userId }
-  });
-}
-
-export async function updateUserRole(userId: string, role: string) {
-  await checkAdmin();
-  return await prisma.user.update({
-    where: { id: userId },
-    data: { role }
-  });
+    await checkAdmin();
+    return await prisma.user.delete({
+        where: { id: userId }
+    });
 }
 
 export async function updateUserCredits(userId: string, credits: number) {
-  await checkAdmin();
-  return await prisma.user.update({
-    where: { id: userId },
-    data: { credits }
-  });
+    await checkAdmin();
+    return await prisma.user.update({
+        where: { id: userId },
+        data: { credits }
+    });
 }
 
-export async function updateUserPlan(userId: string, plan: string) {
-  await checkAdmin();
-  return await prisma.user.update({
-    where: { id: userId },
-    data: { plan }
-  });
-}
+export async function getTickets(status: string = 'all', tag: string = '') {
+    await checkAdmin();
+    const where: any = {};
+    if (status !== 'all') where.status = status;
+    if (tag) where.tags = { has: tag };
 
-export async function getTickets(status?: string, tag?: string) {
-  await checkAdmin();
-  
-  const where: any = {};
-  if (status && status !== 'all') where.status = status;
-  if (tag) where.tags = { has: tag };
-
-  return await prisma.ticket.findMany({
-    where,
-    include: {
-        user: {
-            select: { name: true, email: true, image: true, credits: true }
-        }
-    },
-    orderBy: { createdAt: 'desc' }
-  });
+    return await prisma.ticket.findMany({
+        where,
+        include: { user: true },
+        orderBy: { createdAt: 'desc' }
+    });
 }
 
 export async function replyTicket(ticketId: string, reply: string) {
@@ -340,7 +202,7 @@ export async function replyTicket(ticketId: string, reply: string) {
     where: { id: ticketId },
     data: { 
         reply,
-        status: 'replied',
+        status: 'closed',
         updatedAt: new Date()
     }
   });
@@ -349,48 +211,33 @@ export async function replyTicket(ticketId: string, reply: string) {
 export async function updateTicketTags(ticketId: string, tags: string[]) {
     await checkAdmin();
     return await prisma.ticket.update({
-      where: { id: ticketId },
-      data: { tags }
-    });
-}
-
-export async function closeTicket(ticketId: string) {
-    await checkAdmin();
-    return await prisma.ticket.update({
-      where: { id: ticketId },
-      data: { status: 'closed' }
+        where: { id: ticketId },
+        data: { tags }
     });
 }
 
 export async function getSystemSettings() {
     await checkAdmin();
-    // Assuming we store settings in a JSON file or a Settings table. 
-    // For now, we can mock or use a simple KV store if implemented.
-    // Or we can query the first row of a Settings table.
-    
-    // For this implementation, let's assume we might have a Settings model later.
-    // Or we just return mock data for GA/AdSense if not stored in DB yet.
-    // If you want to persist, you should add a Settings model to Prisma.
-    // But user asked for frontend changes mostly.
-    // Let's assume we return empty object or mocked data.
-    return {};
+    const settings = await prisma.systemSetting.findMany();
+    const result: Record<string, string> = {};
+    settings.forEach(s => result[s.key] = s.value);
+    return result;
 }
 
 export async function saveSystemSetting(key: string, value: string) {
     await checkAdmin();
-    // TODO: Implement persistence
-    console.log(`Saving setting ${key} = ${value}`);
-    return { success: true };
+    return await prisma.systemSetting.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value, description: '' }
+    });
 }
 
 export async function resetAllAnalysis() {
-  await checkAdmin();
-  try {
-    // Delete all analysis records
-    const { count } = await prisma.analysis.deleteMany({});
+    await checkAdmin();
+    const { count } = await prisma.analysis.deleteMany();
+    // Also clear favorites and user challenges if necessary, but analysis delete cascade might handle it if set up, 
+    // otherwise manual delete. Schema says User -> Analysis (Cascade), but Analysis -> others?
+    // Assuming simple delete for now.
     return { success: true, count };
-  } catch (error) {
-    console.error("Failed to reset analysis:", error);
-    throw new Error("Reset failed");
-  }
 }

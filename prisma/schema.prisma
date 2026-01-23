@@ -24,6 +24,8 @@ model User {
   subscriptionExpiresAt DateTime?          // When the subscription credits expire/renew
   trialStartedAt DateTime?                 // When the free trial started
   lastLogin     DateTime? // Last login timestamp
+  lastIp        String?   // Last login IP address
+  loginMethod   String?   // Last login method (e.g. google, line)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

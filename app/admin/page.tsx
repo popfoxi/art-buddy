@@ -23,7 +23,10 @@ import {
   AlertTriangle,
   Plus,
   Minus,
-  X
+  X,
+  Zap,
+  Palette,
+  Crown
 } from "lucide-react";
 import Link from "next/link";
 import { clsx } from "clsx";
@@ -50,9 +53,12 @@ export default function AdminPage() {
     totalAnalysis: 0,
     totalCredits: 0,
     recentUsers: [] as any[],
-    trend7d: [] as { date: string, general: number, master: number, total: number }[],
-    trendMonthly: [] as { date: string, general: number, master: number, total: number }[],
+    trend7d: [] as { date: string, general: number, master: number, paid: number, total: number }[],
+    trendMonthly: [] as { date: string, general: number, master: number, paid: number, total: number }[],
     last7DaysAnalysis: 0,
+    last7DaysUniqueUsers: 0,
+    last7DaysAvgUsage: "0",
+    last7DaysPaidRatio: "0",
     analysisFree: 0,
     analysisPlus: 0,
     analysisPro: 0,
@@ -431,116 +437,153 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* KPI Cards Row 1: Business Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">今日分析</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.todayAnalysis}</div>
+            {/* AI Usage Deep Dive */}
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2 mt-8">
+                <Zap className="text-amber-500" />
+                AI 深度使用分析 (AI Usage Deep Dive)
+            </h2>
+
+            {/* Row 1: Top Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+               {/* Unique Users */}
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                        <Users size={16} />
+                    </div>
+                    <div className="text-xs text-slate-500 font-bold">近 7 日不重複使用者</div>
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{stats.last7DaysUniqueUsers} <span className="text-sm font-bold text-slate-400">人</span></div>
                </div>
-               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">近 7 日分析</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.last7DaysAnalysis}</div>
+               
+               {/* Total Analysis */}
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                        <Activity size={16} />
+                    </div>
+                    <div className="text-xs text-slate-500 font-bold">近 7 日總分析次數</div>
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{stats.last7DaysAnalysis} <span className="text-sm font-bold text-slate-400">次</span></div>
                </div>
-               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">付費使用佔比</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.paidUserUsageRatio}%</div>
+
+               {/* Avg Usage */}
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                        <TrendingUp size={16} />
+                    </div>
+                    <div className="text-xs text-slate-500 font-bold">平均每人使用</div>
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{stats.last7DaysAvgUsage} <span className="text-sm font-bold text-slate-400">次</span></div>
                </div>
-               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">平均每人使用</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.averageUsagePerUser}</div>
-               </div>
-               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">估算 API 成本</div>
-                  <div className="text-2xl font-black text-slate-900">${stats.estimatedCost}</div>
+
+               {/* Paid Ratio */}
+               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-rose-50 rounded-lg text-rose-600">
+                        <Crown size={16} />
+                    </div>
+                    <div className="text-xs text-slate-500 font-bold">付費使用佔比</div>
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{stats.last7DaysPaidRatio}%</div>
                </div>
             </div>
 
-            {/* KPI Cards Row 2: Breakdown Stats */}
+            {/* Row 2: Distributions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Member Type Breakdown */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 mb-4">會員類型分佈</h3>
-                    {stats.totalAnalysis === 0 ? (
-                         <div className="text-center py-8 text-slate-400 text-sm">尚無資料</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {/* Free */}
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-slate-500">Free</span>
-                                <span className="font-bold">{stats.analysisFree} ({stats.totalAnalysis > 0 ? ((stats.analysisFree/stats.totalAnalysis)*100).toFixed(1) : 0}%)</span>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Users size={16} className="text-slate-400" />
+                        會員類型分佈 (Member Types)
+                    </h3>
+                    <div className="flex-1 space-y-4">
+                        {/* Free */}
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-xs font-bold">
+                                <span className="text-slate-500">Free Users</span>
+                                <span className="text-slate-700">{stats.analysisFree} 次 ({stats.totalAnalysis > 0 ? Math.round(stats.analysisFree/stats.totalAnalysis*100) : 0}%)</span>
                             </div>
-                            {/* Plus */}
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-blue-500">Plus</span>
-                                <span className="font-bold">{stats.analysisPlus} ({stats.totalAnalysis > 0 ? ((stats.analysisPlus/stats.totalAnalysis)*100).toFixed(1) : 0}%)</span>
-                            </div>
-                             {/* Pro */}
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-rose-500">Pro</span>
-                                <span className="font-bold">{stats.analysisPro} ({stats.totalAnalysis > 0 ? ((stats.analysisPro/stats.totalAnalysis)*100).toFixed(1) : 0}%)</span>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-slate-300 rounded-full" style={{ width: `${stats.totalAnalysis > 0 ? stats.analysisFree/stats.totalAnalysis*100 : 0}%` }}></div>
                             </div>
                         </div>
-                    )}
+                        {/* Plus */}
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-xs font-bold">
+                                <span className="text-blue-500">Plus Members</span>
+                                <span className="text-blue-700">{stats.analysisPlus} 次 ({stats.totalAnalysis > 0 ? Math.round(stats.analysisPlus/stats.totalAnalysis*100) : 0}%)</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${stats.totalAnalysis > 0 ? stats.analysisPlus/stats.totalAnalysis*100 : 0}%` }}></div>
+                            </div>
+                        </div>
+                        {/* Pro */}
+                        <div className="space-y-1">
+                            <div className="flex justify-between text-xs font-bold">
+                                <span className="text-rose-500">Pro Members</span>
+                                <span className="text-rose-700">{stats.analysisPro} 次 ({stats.totalAnalysis > 0 ? Math.round(stats.analysisPro/stats.totalAnalysis*100) : 0}%)</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-rose-500 rounded-full" style={{ width: `${stats.totalAnalysis > 0 ? stats.analysisPro/stats.totalAnalysis*100 : 0}%` }}></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Function Breakdown */}
-                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 mb-4">功能類型分佈</h3>
-                    {stats.analysisByScenario.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400 text-sm">尚無資料</div>
-                    ) : (
-                         <div className="space-y-3">
-                            {stats.analysisByScenario.map((item, i) => (
-                                <div key={i} className="flex items-center justify-between text-sm">
-                                    <span className="text-slate-500">{item.name === 'general' ? '綜合評分' : item.name === 'style-challenge' ? '風格挑戰' : item.name}</span>
-                                    <span className="font-bold">{item.value}</span>
-                                </div>
-                            ))}
-                         </div>
-                    )}
+                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Zap size={16} className="text-slate-400" />
+                        功能類型分佈 (Functions)
+                    </h3>
+                    <div className="flex-1 overflow-y-auto max-h-[200px] pr-2 space-y-3 custom-scrollbar">
+                        {stats.analysisByScenario.map((item, i) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                                <span className="text-slate-500 font-medium">{item.name === 'general' ? '綜合評分' : item.name === 'style-challenge' ? '風格挑戰' : item.name}</span>
+                                <span className="font-bold bg-slate-50 px-2 py-1 rounded-md text-slate-700">{item.value}</span>
+                            </div>
+                        ))}
+                        {stats.analysisByScenario.length === 0 && <div className="text-center text-slate-400 text-xs py-4">尚無資料</div>}
+                    </div>
                 </div>
 
                 {/* Medium Breakdown */}
-                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 mb-4">繪畫媒材分佈</h3>
-                    {stats.analysisByMedium.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400 text-sm">尚無資料</div>
-                    ) : (
-                         <div className="space-y-3">
-                            {stats.analysisByMedium.map((item, i) => (
-                                <div key={i} className="flex items-center justify-between text-sm">
-                                    <span className="text-slate-500">{item.name}</span>
-                                    <span className="font-bold">{item.value}</span>
-                                </div>
-                            ))}
-                         </div>
-                    )}
+                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <Palette size={16} className="text-slate-400" />
+                        繪畫媒材分佈 (Mediums)
+                    </h3>
+                    <div className="flex-1 overflow-y-auto max-h-[200px] pr-2 space-y-3 custom-scrollbar">
+                         {stats.analysisByMedium.map((item, i) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                                <span className="text-slate-500 font-medium">{item.name}</span>
+                                <span className="font-bold bg-slate-50 px-2 py-1 rounded-md text-slate-700">{item.value}</span>
+                            </div>
+                        ))}
+                        {stats.analysisByMedium.length === 0 && <div className="text-center text-slate-400 text-xs py-4">尚無資料</div>}
+                    </div>
                 </div>
             </div>
 
-            {/* Chart */}
+            {/* Trend Chart */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">AI 分析次數趨勢</h3>
+                    <h3 className="text-lg font-bold text-slate-900">AI 分析趨勢 (Trends)</h3>
                     {(() => {
                         const total = chartData.reduce((a, b) => a + b.total, 0);
-                        const general = chartData.reduce((a, b) => a + b.general, 0);
-                        const master = chartData.reduce((a, b) => a + b.master, 0);
-                        const gPct = total ? Math.round((general / total) * 100) : 0;
-                        const mPct = total ? Math.round((master / total) * 100) : 0;
+                        const paid = chartData.reduce((a, b) => a + (b.paid || 0), 0);
+                        const pPct = total ? Math.round((paid / total) * 100) : 0;
                         
                         return (
                             <div className="flex items-center gap-4 mt-2">
                                 <div className="text-sm text-slate-500 font-bold">總計 {total} 次</div>
                                 <div className="h-4 w-px bg-slate-200"></div>
                                 <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                                    <span className="text-sm font-bold text-slate-700">一般 {gPct}% ({general})</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                                    <span className="text-sm font-bold text-slate-700">大師 {mPct}% ({master})</span>
+                                    <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                                    <span className="text-sm font-bold text-slate-700">付費使用 {pPct}% ({paid})</span>
                                 </div>
                             </div>
                         );
@@ -568,26 +611,26 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Usage Ratio Bar */}
+                {/* Usage Ratio Bar (Paid vs Free) */}
                 <div className="mb-6">
                   <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                        <span>媒介分析 (一般) {chartData.reduce((a,b)=>a+b.total,0) > 0 ? Math.round((chartData.reduce((a,b)=>a+b.general,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100) : 0}%</span>
+                        <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                        <span>付費使用 {chartData.reduce((a,b)=>a+b.total,0) > 0 ? Math.round((chartData.reduce((a,b)=>a+(b.paid||0),0) / chartData.reduce((a,b)=>a+b.total,0)) * 100) : 0}%</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                        <span>大師風格挑戰 {chartData.reduce((a,b)=>a+b.total,0) > 0 ? Math.round((chartData.reduce((a,b)=>a+b.master,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100) : 0}%</span>
+                        <div className="w-2 h-2 rounded-full bg-slate-300"></div>
+                        <span>免費/其他 {chartData.reduce((a,b)=>a+b.total,0) > 0 ? Math.round(((chartData.reduce((a,b)=>a+b.total,0) - chartData.reduce((a,b)=>a+(b.paid||0),0)) / chartData.reduce((a,b)=>a+b.total,0)) * 100) : 0}%</span>
                     </div>
                   </div>
                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
                     <div 
-                      className="h-full bg-blue-500" 
-                      style={{ width: `${chartData.reduce((a,b)=>a+b.total,0) > 0 ? (chartData.reduce((a,b)=>a+b.general,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100 : 0}%` }}
+                      className="h-full bg-rose-500" 
+                      style={{ width: `${chartData.reduce((a,b)=>a+b.total,0) > 0 ? (chartData.reduce((a,b)=>a+(b.paid||0),0) / chartData.reduce((a,b)=>a+b.total,0)) * 100 : 0}%` }}
                     />
                     <div 
-                      className="h-full bg-purple-500" 
-                      style={{ width: `${chartData.reduce((a,b)=>a+b.total,0) > 0 ? (chartData.reduce((a,b)=>a+b.master,0) / chartData.reduce((a,b)=>a+b.total,0)) * 100 : 0}%` }}
+                      className="h-full bg-slate-300" 
+                      style={{ width: `${chartData.reduce((a,b)=>a+b.total,0) > 0 ? ((chartData.reduce((a,b)=>a+b.total,0) - chartData.reduce((a,b)=>a+(b.paid||0),0)) / chartData.reduce((a,b)=>a+b.total,0)) * 100 : 0}%` }}
                     />
                   </div>
                 </div>
@@ -601,21 +644,21 @@ export default function AdminPage() {
                                 {new Date(data.date).toLocaleDateString(undefined, analysisTimeRange === '30d' ? {year: 'numeric', month: 'long'} : {month: 'numeric', day: 'numeric'})}
                               </div>
                               <div>總計: {data.total}</div>
-                              <div className="text-blue-300">一般: {data.general}</div>
-                              <div className="text-purple-300">大師: {data.master}</div>
+                              <div className="text-rose-300">付費: {data.paid}</div>
+                              <div className="text-slate-300">免費: {data.total - (data.paid || 0)}</div>
                             </div>
                             
-                            <div className="relative w-full bg-slate-50 rounded-t-sm md:rounded-t-lg overflow-hidden flex flex-col-reverse justify-start" style={{ height: `${maxCount > 0 ? (data.total / maxCount) * 100 : 0}%` }}>
-                                {/* General Bar (Blue) */}
+                            <div className="relative w-full bg-slate-100 rounded-t-sm md:rounded-t-lg overflow-hidden flex flex-col-reverse justify-start" style={{ height: `${maxCount > 0 ? (data.total / maxCount) * 100 : 0}%` }}>
+                                {/* Paid Bar (Rose) */}
                                 <div 
-                                  className="w-full bg-blue-500 transition-all duration-500" 
-                                  style={{ height: `${data.total > 0 ? (data.general / data.total) * 100 : 0}%` }}
+                                  className="w-full bg-rose-500 transition-all duration-500" 
+                                  style={{ height: `${data.total > 0 ? ((data.paid || 0) / data.total) * 100 : 0}%` }}
                                 ></div>
-                                {/* Master Bar (Purple) */}
-                                <div 
-                                  className="w-full bg-purple-500 transition-all duration-500" 
-                                  style={{ height: `${data.total > 0 ? (data.master / data.total) * 100 : 0}%` }}
-                                ></div>
+                                {/* Free Bar (Slate) - Implicitly shown by background, but we can make it explicit if needed. 
+                                    Since we use flex-col-reverse and justify-start, the rose bar is at the bottom. 
+                                    The remaining space is the background (slate-100).
+                                    Actually, flex-col-reverse puts the first child at the bottom.
+                                */}
                             </div>
                             <span className="text-[10px] md:text-xs font-bold text-slate-400 hidden md:block">
                               {new Date(data.date).toLocaleDateString(undefined, analysisTimeRange === '30d' ? {year: '2-digit', month:'numeric'} : {month:'numeric', day:'numeric'})}
@@ -726,8 +769,12 @@ export default function AdminPage() {
                                     )}
                                 </td>
                                 <td className="p-4 text-sm font-bold text-slate-900">{u.credits}</td>
-                                <td className="p-4 text-xs text-slate-400">
-                                    {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '-'}
+                                <td className="p-4">
+                                    <div className="text-xs text-slate-500 font-bold">{u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : '-'}</div>
+                                    <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
+                                        <span className="bg-slate-100 px-1.5 py-0.5 rounded uppercase">{u.loginMethod || 'unknown'}</span>
+                                        <span>{u.lastIp || 'No IP'}</span>
+                                    </div>
                                 </td>
                                 <td className="p-4">
                                     <div className="flex items-center gap-2">
@@ -771,8 +818,7 @@ export default function AdminPage() {
       case "revenue":
         return (
           <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-slate-900">營收報表</h2>
+            <div className="flex justify-end mb-4">
                 <div className="text-xs text-slate-400 font-bold bg-slate-100 px-3 py-1 rounded-full">
                     資料更新於: {new Date().toLocaleTimeString()}
                 </div>

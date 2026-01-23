@@ -2761,21 +2761,22 @@ export default function Home() {
                                     建立新提問
                                 </h3>
                                 <div className="space-y-3">
-                                    {/* Category Select - Refactored to Buttons */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {SUPPORT_CATEGORIES.map((cat) => (
-                                            <button
-                                                key={cat.id}
-                                                onClick={() => setTicketCategory(cat.id)}
-                                                className={`px-4 py-3 rounded-xl text-xs font-bold transition-all border ${
-                                                    ticketCategory === cat.id 
-                                                        ? "bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]" 
-                                                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                                                }`}
-                                            >
-                                                {cat.label}
-                                            </button>
-                                        ))}
+                                    {/* Category Select - Refactored to Dropdown */}
+                                    <div className="relative">
+                                        <select
+                                            value={ticketCategory}
+                                            onChange={(e) => setTicketCategory(e.target.value)}
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all appearance-none text-slate-700 cursor-pointer"
+                                        >
+                                            {SUPPORT_CATEGORIES.map((cat) => (
+                                                <option key={cat.id} value={cat.id}>
+                                                    {cat.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                                            <ChevronDown size={16} />
+                                        </div>
                                     </div>
                                     
                                     <input 

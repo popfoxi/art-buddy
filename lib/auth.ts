@@ -3,6 +3,7 @@ import GoogleProvider from "next-auth/providers/google";
 import LineProvider from "next-auth/providers/line";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
+import { headers } from "next/headers";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -28,11 +29,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   events: {
-    async signIn({ user }) {
+    async signIn({ user, account }) {
       if (user.id) {
+        let ip = "unknown";
+        try {
+          const headersList = headers();
+          const forwarded = headersList.get("x-forwarded-for");
+          ip = forwarded ? forwarded.split(',')[0] : "unknown";
+        } catch (e) {
+          console.error("Failed to get IP", e);
+        }
+
         await prisma.user.update({
           where: { id: user.id },
-          data: { lastLogin: new Date() },
+          data: { 
+            lastLogin: new Date(),
+            lastIp: ip,
+            loginMethod: account?.provider
+          },
         });
       }
     },
