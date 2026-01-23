@@ -205,7 +205,7 @@ export default function Home() {
 
   // Profile Modal States
   const [showProModal, setShowProModal] = useState(false);
-  const [proPlanType, setProPlanType] = useState<"pro" | "pro_plus">("pro");
+  const [proPlanType, setProPlanType] = useState<"free" | "plus" | "pro">("plus");
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(false);
@@ -339,15 +339,29 @@ export default function Home() {
             setShowProModal(true);
             return null;
         }
-        throw new Error("API Request Failed");
+        const errorData = await response.json().catch(() => ({}));
+        let errorMsg = errorData.error || `API Error: ${response.status}`;
+        if (errorData.details) {
+             if (typeof errorData.details === 'string') {
+                 errorMsg += ` (${errorData.details})`;
+             } else {
+                 try {
+                    errorMsg += ` (${JSON.stringify(errorData.details)})`;
+                 } catch (e) {
+                    errorMsg += " (Details hidden)";
+                 }
+             }
+        }
+        throw new Error(errorMsg);
       }
 
       sendGAEvent('analyze_success', 'analysis', scenarioId);
       return await response.json();
     } catch (error) {
       console.error("AI Analysis Error:", error);
-      sendGAEvent('analyze_error', 'analysis', error instanceof Error ? error.message : 'Unknown Error');
-      alert("AI 分析出了點小問題，請稍後再試。");
+      const errorMessage = error instanceof Error ? error.message : 'Unknown Error';
+      sendGAEvent('analyze_error', 'analysis', errorMessage);
+      alert(`AI 分析錯誤: ${errorMessage}`);
       return null;
     }
   };
@@ -884,7 +898,7 @@ export default function Home() {
                     step3_techniques: [],
                     step4_advice: [],
                     step5_scoring: { 
-                        media_mastery: { score: 0, reason: "請檢查網路" },
+                        media_mastery: { score: 0, reason: "請檢查網路或稍後再試" },
                         structure_proportion: { score: 0, reason: "" },
                         style_consistency: { score: 0, reason: "" },
                         visual_completeness: { score: 0, reason: "" }
@@ -892,11 +906,18 @@ export default function Home() {
                     total_score: 0
                 });
              } else {
-                 alert("分析失敗，請稍後再試");
+                 // Alert handled in analyzeWithAI
              }
         }
       } catch (error) {
-        console.error(error);
+        console.error("Image Upload Detailed Error:", {
+            error: error instanceof Error ? error.message : error,
+            file: file.name,
+            fileSize: file.size,
+            isChallengeSource: isChallengeSource,
+            effectiveChallengeId: effectiveChallengeId
+        });
+        alert(`上傳處理失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
       } finally {
         setIsAnalyzing(false);
       }
@@ -2479,56 +2500,56 @@ export default function Home() {
                 </button>
                 
                 <div className="p-6 pt-12">
-                    {/* Free Limit Warning */}
-                    <div className="text-center mb-6">
-                         <div className="inline-block bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-xs font-bold mb-3">
-                             免費額度已用完
-                         </div>
-                         <h3 className="text-lg font-black text-slate-900 mb-2">本週免費額度已用完</h3>
-                         <p className="text-sm text-slate-500">
-                             升級 Plus 方案，每天都能獲得專業指導<br/>
-                             讓進步不再受限！
-                         </p>
-                    </div>
-
                     {/* Plan Toggles */}
                     <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative">
                         <button 
-                            onClick={() => setProPlanType("pro")}
-                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 flex flex-col items-center justify-center leading-none gap-1 ${proPlanType === "pro" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                            onClick={() => setProPlanType("free")}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 flex items-center justify-center ${proPlanType === "free" ? "text-slate-900 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                        >
+                            Free
+                        </button>
+                        <button 
+                            onClick={() => setProPlanType("plus")}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 flex flex-col items-center justify-center leading-none gap-1 ${proPlanType === "plus" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                         >
                             <span className="text-sm">Plus</span>
                             <span className="text-[10px] text-rose-500 font-extrabold">推薦</span>
                         </button>
                         <button 
-                            onClick={() => setProPlanType("pro_plus")}
-                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 flex items-center justify-center ${proPlanType === "pro_plus" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                            onClick={() => setProPlanType("pro")}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all relative z-10 flex items-center justify-center ${proPlanType === "pro" ? "text-rose-600 bg-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                         >
-                            Pro+
+                            Pro
                         </button>
                     </div>
 
                     <div className="text-center mb-6">
                         <div className="w-16 h-16 bg-gradient-to-br from-rose-400 to-rose-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg shadow-rose-200 transform rotate-3">
-                            <Star size={32} fill="currentColor" />
+                            {proPlanType === "free" ? <Sparkles size={32} /> : <Star size={32} fill="currentColor" />}
                         </div>
                         <h2 className="text-xl font-black text-slate-900 mb-1">
-                            {proPlanType === "pro" ? "每天一張，穩定進步" : "給真正認真學畫的人"}
+                            {proPlanType === "free" ? "輕鬆開始，每週練習" : proPlanType === "plus" ? "每天一張，穩定進步" : "給真正認真學畫的人"}
                         </h2>
                         <p className="text-sm text-slate-500">
-                            {proPlanType === "pro" ? "適合建立繪畫習慣的你" : "適合追求極致細節的你"}
+                            {proPlanType === "free" ? "適合偶爾畫畫的你" : proPlanType === "plus" ? "適合建立繪畫習慣的你" : "適合追求極致細節的你"}
                         </p>
                     </div>
 
                     <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-6">
                         <div className="flex items-baseline justify-center gap-1 mb-4">
                             <span className="text-3xl font-black text-slate-900">
-                                {proPlanType === "pro" ? "$150" : "$300"}
+                                {proPlanType === "free" ? "免費" : proPlanType === "plus" ? "$150" : "$300"}
                             </span>
-                            <span className="text-sm text-slate-500 font-bold">/ 月</span>
+                            {proPlanType !== "free" && <span className="text-sm text-slate-500 font-bold">/ 月</span>}
                         </div>
                         <ul className="space-y-3">
-                            {(proPlanType === "pro" ? [
+                            {(proPlanType === "free" ? [
+                                "每週 1 次免費分析",
+                                "基礎評分報告",
+                                "風格探索 (部分開放)",
+                                "有廣告支持",
+                                "社群作品瀏覽"
+                            ] : proPlanType === "plus" ? [
                                 "每月 30 次作品分析 (一天 1 次)",
                                 "解鎖所有畫風案例",
                                 "完整「畫風技巧＋臨摹重點」",
@@ -2542,7 +2563,7 @@ export default function Home() {
                                 "專屬大師風格評分報告"
                             ]).map((feature, i) => (
                                 <li key={i} className="flex items-center gap-3 text-sm text-slate-700">
-                                    <div className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${proPlanType === 'free' ? 'bg-slate-200 text-slate-500' : 'bg-rose-100 text-rose-600'}`}>
                                         <CheckCircle2 size={12} />
                                     </div>
                                     {feature}
@@ -2551,11 +2572,14 @@ export default function Home() {
                         </ul>
                     </div>
 
-                    <button className="w-full py-3.5 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 mb-3">
-                        立即升級 {proPlanType === "pro" ? "Plus" : "Pro+"}
+                    <button 
+                        disabled={proPlanType === 'free'}
+                        className={`w-full py-3.5 rounded-xl font-bold transition-colors shadow-lg shadow-rose-200 mb-3 ${proPlanType === 'free' ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-rose-600 text-white hover:bg-rose-700'}`}
+                    >
+                        {proPlanType === 'free' ? "目前方案" : `立即升級 ${proPlanType === "plus" ? "Plus" : "Pro"}`}
                     </button>
                     <p className="text-center text-[10px] text-slate-400">
-                        隨時可取消訂閱，不綁約
+                        Free 會員每週一 00:00 自動重置額度 • 隨時可取消訂閱
                     </p>
                 </div>
             </div>
@@ -2737,22 +2761,21 @@ export default function Home() {
                                     建立新提問
                                 </h3>
                                 <div className="space-y-3">
-                                    {/* Category Select */}
-                                    <div className="relative">
-                                        <select
-                                            value={ticketCategory}
-                                            onChange={(e) => setTicketCategory(e.target.value)}
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all appearance-none font-bold text-slate-700"
-                                        >
-                                            {SUPPORT_CATEGORIES.map((cat) => (
-                                                <option key={cat.id} value={cat.id}>
-                                                    {cat.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                            <ChevronDown size={16} />
-                                        </div>
+                                    {/* Category Select - Refactored to Buttons */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {SUPPORT_CATEGORIES.map((cat) => (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => setTicketCategory(cat.id)}
+                                                className={`px-4 py-3 rounded-xl text-xs font-bold transition-all border ${
+                                                    ticketCategory === cat.id 
+                                                        ? "bg-slate-900 text-white border-slate-900 shadow-md transform scale-[1.02]" 
+                                                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                                                }`}
+                                            >
+                                                {cat.label}
+                                            </button>
+                                        ))}
                                     </div>
                                     
                                     <input 

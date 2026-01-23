@@ -187,7 +187,17 @@ export async function POST(req: Request) {
     }
 
     const data = await response.json();
-    const content = JSON.parse(data.choices[0].message.content);
+    let content;
+    try {
+        content = JSON.parse(data.choices[0].message.content);
+    } catch (parseError) {
+        console.error("Failed to parse OpenAI response:", data.choices[0].message.content);
+        return NextResponse.json({ 
+            error: "Invalid AI response format", 
+            details: "The AI did not return valid JSON.",
+            raw: data.choices[0].message.content 
+        }, { status: 500 });
+    }
 
     // Save analysis and DEDUCT CREDITS if user is logged in
     if (session?.user?.email && user) {

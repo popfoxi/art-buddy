@@ -51,7 +51,26 @@ export default function AdminPage() {
     totalCredits: 0,
     recentUsers: [] as any[],
     trend7d: [] as { date: string, general: number, master: number, total: number }[],
-    trendMonthly: [] as { date: string, general: number, master: number, total: number }[]
+    trendMonthly: [] as { date: string, general: number, master: number, total: number }[],
+    last7DaysAnalysis: 0,
+    analysisFree: 0,
+    analysisPlus: 0,
+    analysisPro: 0,
+    paidUserUsageRatio: "0",
+    averageUsagePerUser: "0",
+    estimatedCost: "0",
+    analysisByScenario: [] as { name: string, value: number }[],
+    analysisByMedium: [] as { name: string, value: number }[],
+    revenueMetrics: {
+        monthlyRevenue: 0,
+        todayRevenue: 0,
+        revenuePlus: 0,
+        revenuePro: 0,
+        arpu: 0,
+        last7DaysPaidAnalysis: 0,
+        last7DaysApiCost: 0,
+        last7DaysGrossProfit: 0
+    }
   });
   const [users, setUsers] = useState<any[]>([]);
   const [tickets, setTickets] = useState<any[]>([]);
@@ -412,55 +431,91 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* KPI Cards Row 1: Users & Activity */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">每日註冊人數</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.dailyRegistrations}</div>
-                  <div className="text-xs font-bold text-slate-400 mt-1">今日新增</div>
+            {/* KPI Cards Row 1: Business Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">今日分析</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.todayAnalysis}</div>
                </div>
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">總註冊人數</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.totalUsers}</div>
-                  <div className="text-xs font-bold text-slate-400 mt-1">累積會員</div>
+               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">近 7 日分析</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.last7DaysAnalysis}</div>
                </div>
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">每日登入人數</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.dailyLogins}</div>
-                  <div className="text-xs font-bold text-slate-400 mt-1">今日活躍</div>
+               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">付費使用佔比</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.paidUserUsageRatio}%</div>
                </div>
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">活躍度 (Activity)</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.activityLevel}%</div>
-                  <div className="text-xs font-bold text-slate-400 mt-1">DAU / Total</div>
+               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">平均每人使用</div>
+                  <div className="text-2xl font-black text-slate-900">{stats.averageUsagePerUser}</div>
+               </div>
+               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="text-xs text-slate-500 font-bold mb-1">估算 API 成本</div>
+                  <div className="text-2xl font-black text-slate-900">${stats.estimatedCost}</div>
                </div>
             </div>
 
-            {/* KPI Cards Row 2: Revenue & Retention */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">付費會員 (Plus/Pro)</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.totalPaidUsers}</div>
-                  <div className="flex gap-2 mt-1">
-                    <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">Plus: {stats.paidUsersPlus}</span>
-                    <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded font-bold">Pro: {stats.paidUsersPro}</span>
-                  </div>
-               </div>
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">留存率 (Retention)</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.retentionRate}%</div>
-                  <div className="text-xs font-bold text-slate-400 mt-1">MAU / Total</div>
-               </div>
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">不重複會員</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.totalUsers}</div>
-                  <div className="text-xs font-bold text-slate-400 mt-1">Unique Users</div>
-               </div>
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="text-xs text-slate-500 font-bold mb-1">總發行點數</div>
-                  <div className="text-2xl font-black text-slate-900">{stats.totalCredits}</div>
-                  <div className="text-xs font-bold text-emerald-500 mt-1">可用於分析</div>
-               </div>
+            {/* KPI Cards Row 2: Breakdown Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Member Type Breakdown */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4">會員類型分佈</h3>
+                    {stats.totalAnalysis === 0 ? (
+                         <div className="text-center py-8 text-slate-400 text-sm">尚無資料</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {/* Free */}
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-slate-500">Free</span>
+                                <span className="font-bold">{stats.analysisFree} ({stats.totalAnalysis > 0 ? ((stats.analysisFree/stats.totalAnalysis)*100).toFixed(1) : 0}%)</span>
+                            </div>
+                            {/* Plus */}
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-blue-500">Plus</span>
+                                <span className="font-bold">{stats.analysisPlus} ({stats.totalAnalysis > 0 ? ((stats.analysisPlus/stats.totalAnalysis)*100).toFixed(1) : 0}%)</span>
+                            </div>
+                             {/* Pro */}
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-rose-500">Pro</span>
+                                <span className="font-bold">{stats.analysisPro} ({stats.totalAnalysis > 0 ? ((stats.analysisPro/stats.totalAnalysis)*100).toFixed(1) : 0}%)</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Function Breakdown */}
+                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4">功能類型分佈</h3>
+                    {stats.analysisByScenario.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 text-sm">尚無資料</div>
+                    ) : (
+                         <div className="space-y-3">
+                            {stats.analysisByScenario.map((item, i) => (
+                                <div key={i} className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-500">{item.name === 'general' ? '綜合評分' : item.name === 'style-challenge' ? '風格挑戰' : item.name}</span>
+                                    <span className="font-bold">{item.value}</span>
+                                </div>
+                            ))}
+                         </div>
+                    )}
+                </div>
+
+                {/* Medium Breakdown */}
+                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4">繪畫媒材分佈</h3>
+                    {stats.analysisByMedium.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 text-sm">尚無資料</div>
+                    ) : (
+                         <div className="space-y-3">
+                            {stats.analysisByMedium.map((item, i) => (
+                                <div key={i} className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-500">{item.name}</span>
+                                    <span className="font-bold">{item.value}</span>
+                                </div>
+                            ))}
+                         </div>
+                    )}
+                </div>
             </div>
 
             {/* Chart */}
@@ -715,52 +770,182 @@ export default function AdminPage() {
 
       case "revenue":
         return (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">營收報表</h2>
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-slate-900">營收報表</h2>
+                <div className="text-xs text-slate-400 font-bold bg-slate-100 px-3 py-1 rounded-full">
+                    資料更新於: {new Date().toLocaleTimeString()}
+                </div>
+            </div>
             
-            {/* Revenue Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="text-sm text-slate-500 font-bold mb-1">今日分析次數</div>
-                    <div className="text-3xl font-black text-slate-900">{stats.todayAnalysis}</div>
-                    <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
-                        <TrendingUp size={14} /> 即時更新
+            {/* Block 1: Revenue Overview */}
+            <div className="space-y-4">
+                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-l-4 border-emerald-500 pl-3">
+                    營收總覽 (Revenue Overview)
+                 </h3>
+                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Today's Revenue */}
+                    <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <DollarSign size={48} className="text-emerald-600" />
+                        </div>
+                        <div className="text-sm text-slate-500 font-bold mb-1">今日營收 (預估)</div>
+                        <div className="text-3xl font-black text-emerald-600">NT$ {stats.revenueMetrics?.todayRevenue?.toLocaleString()}</div>
+                        <div className="text-xs font-bold text-slate-400 mt-2 flex items-center gap-1">
+                            <TrendingUp size={12} /> vs 昨日 (N/A)
+                        </div>
                     </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="text-sm text-slate-500 font-bold mb-1">活躍訂閱數 (付費)</div>
-                    <div className="text-3xl font-black text-slate-900">{users.filter(u => u.plan !== 'free').length}</div>
-                    <div className="text-xs font-bold text-emerald-500 mt-2 flex items-center gap-1">
-                        <TrendingUp size={14} /> {(parseFloat(stats.retentionRate || "0")).toFixed(1)}% 轉換率
+
+                    {/* MTD Revenue */}
+                    <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-all">
+                        <div className="text-sm text-slate-500 font-bold mb-1">本月累積營收 (MTD)</div>
+                        <div className="text-3xl font-black text-slate-900">NT$ {stats.revenueMetrics?.monthlyRevenue?.toLocaleString()}</div>
+                        <div className="text-xs font-bold text-emerald-500 mt-2">
+                             基於目前活躍訂閱
+                        </div>
                     </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="text-sm text-slate-500 font-bold mb-1">平均分析分數 (今日)</div>
-                    <div className="text-3xl font-black text-slate-900">-</div>
-                    <div className="text-xs font-bold text-slate-400 mt-2">資料累積中</div>
+
+                    {/* Active Paid Users */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                        <div className="text-sm text-slate-500 font-bold mb-1">有效付費會員數</div>
+                        <div className="text-3xl font-black text-slate-900">{stats.totalPaidUsers} <span className="text-sm font-normal text-slate-400">人</span></div>
+                        <div className="flex items-center gap-3 mt-2 text-xs font-bold">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded">Plus {stats.paidUsersPlus}</span>
+                            <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded">Pro {stats.paidUsersPro}</span>
+                        </div>
+                    </div>
+
+                    {/* ARPU */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                        <div className="text-sm text-slate-500 font-bold mb-1">ARPU (平均客單價)</div>
+                        <div className="text-3xl font-black text-slate-900">NT$ {stats.revenueMetrics?.arpu?.toLocaleString()}</div>
+                        <div className="text-xs font-bold text-slate-400 mt-2">
+                             每付費會員平均貢獻
+                        </div>
+                    </div>
+                 </div>
+            </div>
+
+            {/* Block 2: Revenue Structure */}
+            <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-l-4 border-blue-500 pl-3">
+                    營收來源結構 (Revenue Structure)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* By Plan */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <h4 className="text-sm font-bold text-slate-900 mb-4">A. 依方案拆分 (By Plan)</h4>
+                        <div className="space-y-4">
+                            {/* Plus */}
+                            <div>
+                                <div className="flex justify-between text-sm font-bold mb-1">
+                                    <span className="text-blue-600">Plus 方案 (NT$150)</span>
+                                    <span className="text-slate-900">NT$ {stats.revenueMetrics?.revenuePlus?.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                    <div className="bg-blue-500 h-full" style={{ width: `${stats.revenueMetrics?.monthlyRevenue > 0 ? (stats.revenueMetrics.revenuePlus / stats.revenueMetrics.monthlyRevenue * 100) : 0}%` }}></div>
+                                </div>
+                            </div>
+                            {/* Pro */}
+                            <div>
+                                <div className="flex justify-between text-sm font-bold mb-1">
+                                    <span className="text-rose-600">Pro 方案 (NT$300)</span>
+                                    <span className="text-slate-900">NT$ {stats.revenueMetrics?.revenuePro?.toLocaleString()}</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                    <div className="bg-rose-500 h-full" style={{ width: `${stats.revenueMetrics?.monthlyRevenue > 0 ? (stats.revenueMetrics.revenuePro / stats.revenueMetrics.monthlyRevenue * 100) : 0}%` }}></div>
+                                </div>
+                            </div>
+                            {/* Add-on (Placeholder) */}
+                            <div>
+                                <div className="flex justify-between text-sm font-bold mb-1">
+                                    <span className="text-slate-500">次數加購 (Add-ons)</span>
+                                    <span className="text-slate-900">NT$ 0</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2"></div>
+                            </div>
+                        </div>
+                        <div className="mt-4 p-3 bg-slate-50 rounded-xl text-xs text-slate-500">
+                            💡 提示: 若 Plus 收入佔比過高，可考慮提升 Pro 方案的吸引力或調整定價。
+                        </div>
+                    </div>
+
+                    {/* Subscription vs One-time */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <h4 className="text-sm font-bold text-slate-900 mb-4">B. 訂閱 vs 加購比例 (Recurring vs One-time)</h4>
+                        <div className="flex items-center gap-8">
+                             <div className="relative w-32 h-32 rounded-full border-[12px] border-emerald-500 flex items-center justify-center">
+                                 <div className="text-center">
+                                     <div className="text-2xl font-black text-emerald-600">100<span className="text-sm">%</span></div>
+                                     <div className="text-[10px] font-bold text-slate-400">訂閱制</div>
+                                 </div>
+                             </div>
+                             <div className="space-y-3 flex-1">
+                                 <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                     <div className="flex items-center gap-2">
+                                         <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                                         <span className="text-sm font-bold text-emerald-900">訂閱型收入</span>
+                                     </div>
+                                     <span className="font-black text-emerald-700">100%</span>
+                                 </div>
+                                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                     <div className="flex items-center gap-2">
+                                         <div className="w-3 h-3 bg-slate-300 rounded-full"></div>
+                                         <span className="text-sm font-bold text-slate-500">單次購買</span>
+                                     </div>
+                                     <span className="font-black text-slate-400">0%</span>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Revenue Chart */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-lg font-bold text-slate-900 mb-6">近 {analysisTimeRange === '7d' ? '7' : '30'} 日 AI 分析次數趨勢 (Analysis Trend)</h3>
-                <div className="h-64 flex items-end justify-between gap-1 md:gap-2">
-                    {chartData.map((data, idx) => (
-                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group relative">
-                            {/* Tooltip */}
-                            <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-slate-900 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap shadow-lg">
-                              <div className="font-bold mb-1">{new Date(data.date).toLocaleDateString()}</div>
-                              <div>總計: {data.total}</div>
-                            </div>
+            {/* Block 3: Revenue x Usage */}
+            <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-l-4 border-rose-500 pl-3">
+                    營收 × 使用關係 (Profitability - Last 7 Days)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Total Analysis (7d) */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="text-xs text-slate-500 font-bold mb-1">總分析次數 (7日)</div>
+                        <div className="text-2xl font-black text-slate-900">{stats.last7DaysAnalysis}</div>
+                    </div>
 
-                            <div className="relative w-full bg-blue-50 rounded-t-lg overflow-hidden group-hover:bg-blue-100 transition-colors" style={{ height: `${maxCount > 0 ? (data.total / maxCount) * 100 : 0}%` }}>
-                                <div className="absolute bottom-0 w-full bg-blue-500 h-0 transition-all duration-500" style={{ height: '100%' }}></div>
-                            </div>
-                            <span className="text-[10px] md:text-xs font-bold text-slate-400 hidden md:block">
-                                {idx % (analysisTimeRange === '30d' ? 5 : 1) === 0 ? new Date(data.date).toLocaleDateString(undefined, {month:'numeric', day:'numeric'}) : ''}
-                            </span>
+                    {/* Paid Analysis (7d) */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="text-xs text-slate-500 font-bold mb-1">付費會員使用次數</div>
+                        <div className="text-2xl font-black text-slate-900">{stats.revenueMetrics?.last7DaysPaidAnalysis}</div>
+                        <div className="text-xs font-bold text-slate-400 mt-1">
+                            佔比 {stats.last7DaysAnalysis > 0 ? Math.round(stats.revenueMetrics?.last7DaysPaidAnalysis / stats.last7DaysAnalysis * 100) : 0}%
                         </div>
-                    ))}
+                    </div>
+
+                    {/* API Cost (7d) */}
+                    <div className="bg-white p-5 rounded-2xl border border-rose-50 shadow-sm">
+                        <div className="text-xs text-rose-500 font-bold mb-1">估算 API 成本 (7日)</div>
+                        <div className="text-2xl font-black text-rose-600">- NT$ {stats.revenueMetrics?.last7DaysApiCost}</div>
+                        <div className="text-xs font-bold text-rose-300 mt-1">
+                            以 NT$1 / 次 估算
+                        </div>
+                    </div>
+
+                    {/* Gross Profit (7d) */}
+                    <div className="bg-white p-5 rounded-2xl border border-emerald-50 shadow-sm">
+                        <div className="text-xs text-emerald-600 font-bold mb-1">預估毛利 (7日)</div>
+                        <div className="text-2xl font-black text-emerald-600">
+                             NT$ {stats.revenueMetrics?.last7DaysGrossProfit?.toLocaleString()}
+                        </div>
+                        <div className="text-xs font-bold text-emerald-400 mt-1">
+                            營收 - API 成本
+                        </div>
+                    </div>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-500 flex items-center gap-2">
+                    <Activity size={16} />
+                    <strong>經營指標說明:</strong> 
+                    此區塊協助您判斷「是否有賺錢」。若毛利為負，表示 API 成本過高或定價過低。目前營收是基於活躍會員的預估值。
                 </div>
             </div>
           </div>

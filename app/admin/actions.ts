@@ -54,11 +54,56 @@ export async function getAdminStats() {
     where: { status: "open" }
   });
 
-  // 2. Analysis Stats
+  // 2. Analysis Stats (New KPIs)
+  const totalAnalysis = await prisma.analysis.count();
+  
+  // Today's Analysis
   const todayAnalysis = await prisma.analysis.count({
     where: { createdAt: { gte: today } }
   });
-  const totalAnalysis = await prisma.analysis.count();
+
+  // Last 7 Days Analysis
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const last7DaysAnalysis = await prisma.analysis.count({
+    where: { createdAt: { gte: sevenDaysAgo } }
+  });
+
+  // Usage by Member Type
+  const analysisFree = await prisma.analysis.count({
+    where: { user: { plan: 'free' } }
+  });
+  const analysisPlus = await prisma.analysis.count({
+    where: { user: { plan: 'plus' } }
+  });
+  const analysisPro = await prisma.analysis.count({
+    where: { user: { plan: 'pro' } }
+  });
+  const analysisPaid = analysisPlus + analysisPro;
+  
+  const paidUserUsageRatio = totalAnalysis > 0 ? (analysisPaid / totalAnalysis) * 100 : 0;
+
+  // Average Usage (Analysis per Active User)
+  const averageUsagePerUser = monthlyActiveUsers > 0 ? (totalAnalysis / monthlyActiveUsers) : 0;
+  
+  // Estimated Cost (Assumption: $0.03 per analysis)
+  const estimatedCost = totalAnalysis * 0.03;
+
+  // Breakdowns
+  // By Function (Scenario/Type)
+  // Using scenarioId if available, fallback to type
+  const analysisByScenarioGroup = await prisma.analysis.groupBy({
+    by: ['scenarioId'],
+    _count: { id: true },
+    orderBy: { _count: { id: 'desc' } }
+  });
+  
+  // By Medium
+  const analysisByMediumGroup = await prisma.analysis.groupBy({
+    by: ['mediaId'],
+    _count: { id: true },
+    orderBy: { _count: { id: 'desc' } }
+  });
 
   // 3. Credits
   const usersWithCredits = await prisma.user.findMany({
@@ -131,6 +176,29 @@ export async function getAdminStats() {
     }
   });
 
+  // 6. Revenue Metrics (Estimated)
+  // Assumption: Plus = 150 NTD/mo, Pro = 300 NTD/mo
+  const pricePlus = 150;
+  const pricePro = 300;
+  const revenuePlus = paidUsersPlus * pricePlus;
+  const revenuePro = paidUsersPro * pricePro;
+  const monthlyRevenue = revenuePlus + revenuePro;
+  const todayRevenue = Math.round(monthlyRevenue / 30); // Estimated Daily Run Rate
+  const arpu = totalPaidUsers > 0 ? Math.round(monthlyRevenue / totalPaidUsers) : 0;
+
+  // 7. Last 7 Days Financials
+  const last7DaysPaidAnalysis = await prisma.analysis.count({
+    where: { 
+        createdAt: { gte: sevenDaysAgo },
+        user: { plan: { in: ['plus', 'pro'] } }
+    }
+  });
+  
+  const costPerAnalysis = 1; // Estimated 1 NTD per analysis (GPT-4o-mini)
+  const last7DaysApiCost = last7DaysAnalysis * costPerAnalysis;
+  const last7DaysRevenue = Math.round((monthlyRevenue / 30) * 7);
+  const last7DaysGrossProfit = last7DaysRevenue - last7DaysApiCost;
+
   return {
     totalUsers,
     dailyRegistrations,
@@ -147,7 +215,28 @@ export async function getAdminStats() {
     totalCredits,
     recentUsers,
     trend7d,
-    trendMonthly
+    trendMonthly,
+    // New Stats
+    last7DaysAnalysis,
+    analysisFree,
+    analysisPlus,
+    analysisPro,
+    paidUserUsageRatio: paidUserUsageRatio.toFixed(1),
+    averageUsagePerUser: averageUsagePerUser.toFixed(1),
+    estimatedCost: estimatedCost.toFixed(2),
+    analysisByScenario: analysisByScenarioGroup.map(g => ({ name: g.scenarioId || 'general', value: g._count.id })),
+    analysisByMedium: analysisByMediumGroup.map(g => ({ name: g.mediaId || 'unknown', value: g._count.id })),
+    // Revenue Stats
+    revenueMetrics: {
+        monthlyRevenue,
+        todayRevenue,
+        revenuePlus,
+        revenuePro,
+        arpu,
+        last7DaysPaidAnalysis,
+        last7DaysApiCost,
+        last7DaysGrossProfit
+    }
   };
 }
 
