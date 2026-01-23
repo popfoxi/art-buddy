@@ -57,6 +57,33 @@ export async function getAdminStats() {
   const paidUsersPro = users.filter(u => u.plan === 'pro').length;
   const totalPaidUsers = paidUsersPlus + paidUsersPro;
 
+  // Analysis Breakdown by Plan (Last 7 Days)
+  const analysisFree = last7DaysAnalyses.filter(a => a.user.plan === 'free').length;
+  const analysisPlus = last7DaysAnalyses.filter(a => a.user.plan === 'plus').length;
+  const analysisPro = last7DaysAnalyses.filter(a => a.user.plan === 'pro').length;
+
+  // Analysis by Type/Function
+  const analysisByScenarioMap = new Map<string, number>();
+  // Analysis by Medium
+  const analysisByMediumMap = new Map<string, number>();
+
+  last7DaysAnalyses.forEach(a => {
+      // Scenario/Function
+      const type = a.type || 'unknown';
+      analysisByScenarioMap.set(type, (analysisByScenarioMap.get(type) || 0) + 1);
+
+      // Medium (Assuming mediaId or type implies medium, but sticking to type if mediaId is not available in type)
+      // If we don't have explicit medium field populated yet, we might use type or skip.
+      // Based on schema drift, we have mediaId. 
+      // But for now let's just map type to scenario and maybe something else to medium.
+      // Or just return empty if not implemented yet.
+      // Let's assume 'type' covers function. 
+      // For medium, maybe we don't have data yet.
+  });
+
+  const analysisByScenario = Array.from(analysisByScenarioMap.entries()).map(([name, value]) => ({ name, value }));
+  const analysisByMedium: { name: string, value: number }[] = []; // Placeholder
+
   // Trend 7 days
   const trend7dMap = new Map<string, { total: number, general: number, master: number, paid: number }>();
   
@@ -107,6 +134,11 @@ export async function getAdminStats() {
 
   const totalCredits = users.reduce((sum, u) => sum + u.credits + u.subscriptionCredits, 0);
 
+  // Unresolved tickets
+  const unresolvedTickets = await prisma.ticket.count({
+      where: { status: { not: 'closed' } }
+  });
+
   return {
     totalUsers,
     totalAnalysis,
@@ -116,11 +148,29 @@ export async function getAdminStats() {
     totalCredits,
     recentUsers: recentUsers.map(u => ({ ...u, provider: u.loginMethod || 'email' })),
     trend7d,
-    trendMonthly: [], // Placeholder if not needed immediately
-    last7DaysTotal,
+    trendMonthly: [], 
+    last7DaysAnalysis: last7DaysTotal, // Renamed from last7DaysTotal
     last7DaysUniqueUsers,
     last7DaysAvgUsage,
     last7DaysPaidRatio,
+    
+    // Missing fields expected by UI state
+    dailyRegistrations: 0,
+    dailyLogins: 0,
+    monthlyActiveUsers: 0,
+    retentionRate: "0",
+    activityLevel: "0",
+    unresolvedTickets,
+    todayAnalysis: 0,
+    analysisFree,
+    analysisPlus,
+    analysisPro,
+    paidUserUsageRatio: "0",
+    averageUsagePerUser: "0",
+    estimatedCost: "0",
+    analysisByScenario,
+    analysisByMedium,
+
     revenueMetrics: {
         monthlyRevenue,
         todayRevenue,

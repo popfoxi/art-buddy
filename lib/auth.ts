@@ -33,7 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user.id) {
         let ip = "unknown";
         try {
-          const headersList = headers();
+          const headersList = await headers();
           const forwarded = headersList.get("x-forwarded-for");
           ip = forwarded ? forwarded.split(',')[0] : "unknown";
         } catch (e) {
