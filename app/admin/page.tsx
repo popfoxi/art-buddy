@@ -1094,20 +1094,34 @@ export default function AdminPage() {
             </div>
             
             {/* Tag Filter */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center gap-4">
-                <Filter size={20} className="text-slate-400" />
-                <select 
-                    value={ticketTagFilter}
-                    onChange={(e) => setTicketTagFilter(e.target.value)}
-                    className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 cursor-pointer" 
+            <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-wrap gap-2 items-center">
+                <div className="flex items-center gap-2 mr-2">
+                    <Filter size={20} className="text-slate-400" />
+                    <span className="text-sm font-bold text-slate-500">分類篩選:</span>
+                </div>
+                <button
+                    onClick={() => setTicketTagFilter("")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                        ticketTagFilter === "" 
+                        ? "bg-slate-900 text-white shadow-sm" 
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                 >
-                    <option value="">所有分類 (All Categories)</option>
-                    {SUPPORT_CATEGORIES.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                            {cat.label}
-                        </option>
-                    ))}
-                </select>
+                    所有分類
+                </button>
+                {SUPPORT_CATEGORIES.map((cat) => (
+                    <button
+                        key={cat.id}
+                        onClick={() => setTicketTagFilter(cat.id)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                            ticketTagFilter === cat.id 
+                            ? "bg-slate-900 text-white shadow-sm" 
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                    >
+                        {cat.label}
+                    </button>
+                ))}
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
