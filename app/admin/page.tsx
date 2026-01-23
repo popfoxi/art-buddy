@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Save,
   MessageSquare,
+  AlertTriangle,
   Plus,
   Minus,
   X
@@ -83,6 +84,7 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
 
   const loadUsers = async () => {
       setIsLoading(true);
@@ -263,7 +265,7 @@ export default function AdminPage() {
     setSaveMessage("");
     try {
       const actions = await import("./actions");
-      await actions.updateSystemSetting(key, value);
+      await actions.saveSystemSetting(key, value);
       setSaveMessage("設定已儲存");
       setTimeout(() => setSaveMessage(""), 3000);
     } catch (error) {
@@ -271,6 +273,34 @@ export default function AdminPage() {
       alert("儲存失敗");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleResetAnalysis = async () => {
+    if (!confirm("警告：此操作將刪除所有用戶的分析紀錄、挑戰紀錄與收藏。此動作無法復原！\n\n您確定要繼續嗎？")) return;
+    
+    const verification = prompt("請輸入 'DELETE' 以確認刪除所有分析資料：");
+    if (verification !== 'DELETE') {
+        alert("驗證失敗，取消操作");
+        return;
+    }
+
+    setIsResetting(true);
+    try {
+        const actions = await import("./actions");
+        const result = await actions.resetAllAnalysis();
+        if (result.success) {
+            alert(`重置成功！已刪除 ${result.count} 筆分析紀錄。`);
+            const statsData = await actions.getAdminStats();
+            setStats(statsData);
+        } else {
+            throw new Error("Unknown error");
+        }
+    } catch (error: any) {
+        console.error("Reset failed", error);
+        alert("重置失敗: " + error.message);
+    } finally {
+        setIsResetting(false);
     }
   };
 
@@ -811,9 +841,44 @@ export default function AdminPage() {
                                 </button>
                             </div>
                         </div>
+                        </div>
+                    </div>
+                {/* Danger Zone - Moved inside main container */}
+                <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm">
+                    <h3 className="text-lg font-bold text-red-600 mb-6 flex items-center gap-2">
+                        <AlertTriangle size={20} />
+                        危險區域 (Danger Zone)
+                    </h3>
+                    
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-red-50 last:pb-0 last:border-0">
+                        <div className="flex-1">
+                            <h4 className="font-bold text-slate-900 text-sm">重置所有分析紀錄</h4>
+                            <p className="text-xs text-slate-500 mt-1 max-w-md">
+                                刪除資料庫中所有的分析結果、挑戰紀錄與收藏。這將允許用戶重新分析他們的畫作以獲得最新的評分標準。
+                                <br/>
+                                <span className="font-bold text-red-500">此動作無法復原。</span>
+                            </p>
+                        </div>
+                        <button 
+                            onClick={handleResetAnalysis}
+                            disabled={isResetting}
+                            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-bold hover:bg-red-600 hover:text-white transition-all disabled:opacity-50 shadow-sm flex items-center gap-2"
+                        >
+                            {isResetting ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/>
+                                    處理中...
+                                </>
+                            ) : (
+                                <>
+                                    <Database size={16} />
+                                    清除所有資料
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
-                    </div>
+            </div>
         );
 
       case "support":

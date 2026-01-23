@@ -84,6 +84,7 @@ export default function Home() {
     isTrialExpired: boolean;
     trialStartedAt: Date | null;
     subscriptionExpiresAt: Date | null;
+    canStartTrial?: boolean;
   }>({ 
     total: 0, 
     subscriptionCredits: 0, 
@@ -91,7 +92,8 @@ export default function Home() {
     plan: 'free', 
     isTrialExpired: false, 
     trialStartedAt: null,
-    subscriptionExpiresAt: null
+    subscriptionExpiresAt: null,
+    canStartTrial: false
   });
 
   // Fetch credits from server
@@ -306,7 +308,7 @@ export default function Home() {
     });
   };
 
-  const analyzeWithAI = async (base64Image: string) => {
+  const analyzeWithAI = async (base64Image: string, styleOverride?: string, mediumOverride?: string) => {
     try {
       // Determine scenario based on context
       let scenarioId = 'free_practice';
@@ -325,8 +327,8 @@ export default function Home() {
         },
         body: JSON.stringify({ 
           image: base64Image,
-          styleId: selectedStyle || 'general',
-          mediaId: selectedMedium || 'watercolor',
+          styleId: styleOverride || selectedStyle || 'general',
+          mediaId: mediumOverride || selectedMedium || 'watercolor',
           scenarioId: scenarioId
         }),
       });
@@ -805,7 +807,20 @@ export default function Home() {
       
       try {
         const base64 = await compressImage(file);
-        const aiResult = await analyzeWithAI(base64);
+        
+        // Determine correct style/medium for challenge to ensure consistency
+        let styleOverride = undefined;
+        let mediumOverride = undefined;
+        
+        if (effectiveChallengeId) {
+             const challenge = userChallenges.find(c => c.id === effectiveChallengeId);
+             if (challenge) {
+                 styleOverride = challenge.styleId;
+                 mediumOverride = challenge.mediaId || challenge.medium;
+             }
+        }
+
+        const aiResult = await analyzeWithAI(base64, styleOverride, mediumOverride);
         if (aiResult) {
             setAnalysisCount(prev => prev + 1);
 
@@ -3049,89 +3064,4 @@ export default function Home() {
     </main>
   );
 }
-                                    .filter(artwork => favoriteArtworkIds.includes(artwork.id))
-                                    .filter(artwork => {
-                                        if (favoriteFilterType === "all") return true;
-                                        if (favoriteFilterType === "medium") return artwork.medium === favoriteFilterValue;
-                                        if (favoriteFilterType === "master") return artwork.master === favoriteFilterValue;
-                                        return true;
-                                    })
-                                    .map(artwork => (
-                                        <div 
-                                            key={artwork.id} 
-                                            onClick={() => {
-                                                setSelectedArtwork(artwork);
-                                                setIsFavoritesExpanded(false); // Close modal to show detail
-                                            }}
-                                            className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100"
-                                        >
-                                            <img 
-                                                src={artwork.imageUrl} 
-                                                alt={artwork.title} 
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-                                                <p className="text-white text-xs font-bold line-clamp-1">{artwork.title}</p>
-                                                <p className="text-white/80 text-[10px]">{artwork.master}</p>
-                                            </div>
-                                        </div>
-                                    ))
-                                }
-                            </div>
-                        </>
-                    ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 pb-20">
-                            <Heart size={48} className="mb-4 opacity-20" />
-                            <p className="text-sm font-bold">還沒有收藏的作品</p>
-                            <p className="text-xs mt-1">去探索頁面看看吧！</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-      )}
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 z-50">
-        <div className="max-w-md mx-auto h-20 grid grid-cols-5 items-center pb-4">
-          <button 
-            onClick={() => setActiveTab("home")}
-            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "home" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            <HomeIcon size={24} />
-            <span className="text-[10px] font-bold">首頁</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("explore")}
-            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "explore" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            <Compass size={24} />
-            <span className="text-[10px] font-bold">探索</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("challenge")}
-            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "challenge" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            <Trophy size={24} className={activeTab === "challenge" ? "fill-current" : ""} />
-            <span className="text-[10px] font-bold">挑戰</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("history")}
-            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "history" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            <History size={24} />
-            <span className="text-[10px] font-bold">紀錄</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab("profile")}
-            className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-colors ${activeTab === "profile" ? "text-rose-600" : "text-slate-400 hover:text-slate-600"}`}
-          >
-            <User size={24} />
-            <span className="text-[10px] font-bold">我的</span>
-          </button>
-        </div>
-      </nav>
-    </main>
-  );
-}
-}
