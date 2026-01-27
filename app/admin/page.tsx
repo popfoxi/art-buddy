@@ -31,6 +31,19 @@ import {
 import Link from "next/link";
 import { clsx } from "clsx";
 import { SUPPORT_CATEGORIES } from "@/lib/constants";
+import { 
+  getAdminStats, 
+  getUsers, 
+  getTickets, 
+  getSystemSettings, 
+  updateUser, 
+  createUser, 
+  deleteUser,
+  updateUserCredits,
+  replyTicket,
+  updateTicketTags,
+  saveSystemSetting
+} from "./actions";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -114,8 +127,7 @@ export default function AdminPage() {
   const loadUsers = async () => {
       setIsLoading(true);
       try {
-          const actions = await import("./actions");
-          const usersData = await actions.getUsers(searchQuery, roleFilter, planFilter);
+          const usersData = await getUsers(searchQuery, roleFilter, planFilter);
           setUsers(usersData);
       } catch (error) {
           console.error("Load users failed", error);
@@ -126,8 +138,7 @@ export default function AdminPage() {
 
   const loadTickets = async () => {
     try {
-        const actions = await import("./actions");
-        const data = await actions.getTickets(ticketStatusFilter, ticketTagFilter);
+        const data = await getTickets(ticketStatusFilter, ticketTagFilter);
         setTickets(data);
     } catch (error) {
         console.error("Load tickets failed", error);
@@ -149,26 +160,28 @@ export default function AdminPage() {
   useEffect(() => {
     if (status === "loading" || !session) return;
     
-    import("./actions").then(async (actions) => {
+    const loadData = async () => {
       try {
-        const statsData = await actions.getAdminStats();
+        const statsData = await getAdminStats();
         setStats(statsData);
         
         // Initial load of users
-        const usersData = await actions.getUsers(searchQuery, roleFilter, planFilter);
+        const usersData = await getUsers(searchQuery, roleFilter, planFilter);
         setUsers(usersData);
 
-        const ticketsData = await actions.getTickets();
+        const ticketsData = await getTickets();
         setTickets(ticketsData);
 
-        const settingsData = await actions.getSystemSettings();
+        const settingsData = await getSystemSettings();
         setSettings(settingsData);
       } catch (error) {
         console.error("Failed to fetch admin data", error);
       } finally {
         setIsLoading(false);
       }
-    });
+    };
+    
+    loadData();
   }, [session, status]);
 
   // Reload users when filters change
@@ -183,10 +196,9 @@ export default function AdminPage() {
     if (!editingUser) return;
 
     try {
-        const actions = await import("./actions");
         if (editingUser.id) {
             // Update
-            await actions.updateUser(editingUser.id, {
+            await updateUser(editingUser.id, {
                 name: editingUser.name,
                 email: editingUser.email,
                 role: editingUser.role,
@@ -196,7 +208,7 @@ export default function AdminPage() {
             alert("會員資料更新成功");
         } else {
             // Create
-            await actions.createUser({
+            await createUser({
                 name: editingUser.name,
                 email: editingUser.email,
                 role: editingUser.role,
